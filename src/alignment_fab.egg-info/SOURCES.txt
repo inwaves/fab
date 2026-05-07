@@ -1,0 +1,11 @@
+README.md
+pyproject.toml
+src/alignment_fab/__init__.py
+src/alignment_fab/cli.py
+src/alignment_fab/registry.py
+src/alignment_fab.egg-info/PKG-INFO
+src/alignment_fab.egg-info/SOURCES.txt
+src/alignment_fab.egg-info/dependency_links.txt
+src/alignment_fab.egg-info/entry_points.txt
+src/alignment_fab.egg-info/top_level.txt
+tests/test_registry.py
