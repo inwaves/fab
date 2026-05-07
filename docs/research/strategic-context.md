@@ -1,142 +1,84 @@
 # Strategic Context
 
-This condenses the KB research surrounding Alignment Fab. It is not a
-replacement for the KB; it is the minimum project context needed to start
-building without reopening every note.
+This is the minimum project context needed to build Fab without reopening the
+whole KB.
 
-## Why Alignment Fab Exists
+## Why Fab Exists
 
-The automated alignment researcher thesis says, roughly: build systems that are
-safe enough to help with alignment, use them to produce alignment progress
-faster than capabilities advance, and rely on humans to steer and verify the
-process.
+The automated alignment researcher thesis depends on a hard institutional step:
+large numbers of AI agents produce alignment work, and a small number of human
+researchers still need to decide what is real, fragile, useful, misleading, or
+worth pursuing next.
 
-The KB critique is not that AI-assisted alignment research is useless. It is
-that the thesis is brittle:
+Fab targets that step. It is the protocol layer that turns many agent
+contributions into cumulative, reviewable alignment research.
 
-- "sufficiently aligned" is not operationally defined;
-- more AI-generated research does not automatically mean real progress;
-- competitive pressure pushes capability faster than safety;
-- plausible but subtly wrong research may be a more likely failure mode than
-  explicit scheming;
-- all major legs rely on legible intermediate computation, which may erode;
-- deployment safety is not the same as alignment.
+## The Product Shape
 
-The part that survives is narrower and more actionable: use AI assistance on
-bounded alignment subproblems where verification is tractable, and make the
-research production system itself the object of study.
+The settled protocol is:
 
-Alignment Fab is that production-system layer.
+```text
+contract
+-> workstreams
+-> artefact packages
+-> brief
+-> human judgment
+```
 
-## The Bridge Question
+Fab does not own the agent platform. It owns the research interface:
 
-The KB's "Mitigations to Automated Alignment Research" note frames the central
-transition problem:
+- how a contract becomes a batch of workstreams;
+- what prior knowledge and artefacts agents receive;
+- what agents must emit;
+- how outputs are compared;
+- how human attention is allocated;
+- how human judgment feeds the next contract, batch, or programme state.
 
-Can current containment, monitoring, automated auditing, research epistemics,
-and governance safely bridge us to AI-assisted alignment work that genuinely
-scales?
+## Knowledge Substrate
 
-The least developed part is AI-assisted research epistemics. If agents generate
-many hypotheses and experiments, the bottleneck becomes judgment:
+Agents need access to prior experiments, results, artefacts, code, and human
+judgments. A knowledge base shaped like `inwaves/kb` is a useful local example,
+but Fab should not assume that all deployments use that exact structure.
 
-- Which results are real?
-- Which replicate?
-- Which transfer across datasets, models, and scaffolds?
-- Which are dangerous to pursue or publish?
-- Which should change the alignment agenda?
+The important distinction is:
 
-Candidate mechanisms from the KB include:
+- prior knowledge informs contracts and workstreams;
+- agent work produces artefact packages and proposed updates;
+- humans decide what changes durable understanding.
 
-- separating proposal, execution, judging, replication, and synthesis;
-- hidden tests and private evaluation APIs;
-- independent replication by different model families and scaffolds;
-- adversarial critique agents;
-- provenance tracking for every dataset, prompt, code artifact, and result;
-- human review for agenda-setting decisions;
-- capability-impact review before scaling or releasing methods;
-- live research maps that track what has been tried, what failed, and what later
-  invalidated earlier conclusions.
+Agents should not become librarians. The system should help humans consolidate
+their view from agent work.
 
-Alignment Fab should begin with the parts a human supervisor needs before any of
-that is automated: contracts, state, decisions, provenance pointers, and
-reviewable intervention points.
+## Adjacent Work
 
-## Lessons From Adjacent Directions
+Recent adjacent work gives useful design pressure:
 
-### Automated Weak-to-Strong Researcher
+- Agent-native research artefacts argue that papers are too lossy for agent
+  continuation, and that code, traces, evidence, and failed attempts should be
+  first-class research outputs.
+- Flywheel-like systems show why research often benefits from graph structure:
+  lineage, branches, competing hypotheses, replications, and follow-up.
 
-Anthropic's automated W2S researcher is strong evidence that agents can make
-useful empirical progress when the task is tightly scoped and outcome-gradable.
-It is weaker evidence that agents can choose the right problem, metric, threat
-model, or interpretation.
+Fab can use those ideas without making the graph the atomic unit. The durable
+objects are contracts, workstreams, artefact packages, briefs, and human
+judgments. Graphs are views over their relationships.
 
-Design implication: Alignment Fab should treat eval design and evidence
-admissibility as first-class contract fields, not incidental notes.
+## Design Warnings
 
-### A3 Safety Finetuning
+- More agent output does not automatically mean progress.
+- Outcome-gradable loops can Goodhart their evals.
+- Reports can hide the code and failed attempts needed for replication.
+- Agent-generated structure can become busywork.
+- Human judgment can become ceremonial if too many low-quality items demand
+  attention.
+- Local results can become shared assumptions before their scope is understood.
 
-A3 shows an automated loop for known safety failures: generate adversarial and
-benign data, finetune, evaluate, and iterate. It is a good pilot candidate
-because it has clear artifacts, repeated runs, visible false-positive risks, and
-natural stop/escalation conditions.
+## Local KB Anchors
 
-Design implication: state packets need to capture not just "score improved" but
-also data provenance, benign-counterpart behavior, OOD checks, forgetting
-checks, and what would invalidate the apparent fix.
+Use `inwaves/kb` as grounding context when useful:
 
-### AI Control
-
-AI control assumes the model may be misaligned and asks whether a deployment
-protocol still prevents unacceptable outcomes. It emphasizes bounded action
-channels, synchronous review for high-stakes actions, trusted/untrusted model
-gaps, and adversarial evaluation.
-
-Design implication: future workstream contracts should have explicit tool,
-network, filesystem, model-training, eval-access, and human-gate assumptions.
-
-### Alignment Auditing
-
-AuditBench exposes the tool-to-agent gap: tools can surface evidence that agents
-fail to use, misunderstand, or synthesize into correct hypotheses.
-
-Design implication: Alignment Fab should not only link artifacts. It should
-record claims, evidence, uncertainty, and human decisions in a way that lets
-auditors reconstruct why a result happened and why it was trusted or rejected.
-
-### Harness Search
-
-Harness Search treats the deployed agent loop as part of the system: prompts,
-scratchpad format, memory policy, observation formatting, retry logic, and tool
-schema all affect behavior.
-
-Design implication: the harness/scaffold should be recorded as part of
-workstream provenance whenever agent behavior or safety is being evaluated.
-
-### Frontier-Relative Monitorability
-
-This line asks whether CoT monitorability depends on task difficulty relative to
-model capability. It is a strong pilot candidate because it has a concrete
-experimental design and a clear supervision need: many runs, multiple model
-families, difficulty bins, monitorability metrics, and hidden failure modes.
-
-Design implication: Alignment Fab should support experiments where the same
-contract produces many related workstreams and consolidation is the real value.
-
-## Product Commitments
-
-Alignment Fab should optimize for human judgment, not throughput.
-
-That means:
-
-- contracts before results;
-- live state separate from contracts;
-- reason for continuing as a required supervisory pressure;
-- decisions and rationales recorded append-only;
-- artifact links with provenance rather than artifact sprawl;
-- consolidation before final reports;
-- promotion rules before shared reuse;
-- explicit quarantine paths for suspicious workstreams or claims.
-
-The first version can stay deliberately local and file-backed. The important
-thing is to get the primitives right before adding agent runners or dashboards.
+- `research/alignment-via-ai-assistance.md`
+- `research/mitigations-to-automated-alignment/README.md`
+- `papers/automated-weak-to-strong-researcher.md`
+- `papers/the-last-human-written-paper-agent-native-research-artifacts.md`
+- `articles/the-new-age-of-research.md`

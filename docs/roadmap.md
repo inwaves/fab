@@ -1,203 +1,218 @@
-# Alignment Fab Roadmap
+# Fab Roadmap
 
-This roadmap merges the current repository state with the project research note
-that lived in `kb/research/alignment-factory/README.md`. The repo currently
-contains the registry MVP; the research note supplies the larger product shape.
+## Status Checklist
 
-## Current State
+Last updated: 2026-05-07.
 
-Alignment Fab is a local, file-backed control layer for human-supervised
-automated alignment research. The current code implements only the workstream
-registry and live-state loop:
+Legend: `[x] done`, `[~] in progress`, `[ ] not started`.
 
-- stable workstream records under `.alignment-fab/workstreams/`;
-- separate live-state records under `.alignment-fab/live-state/`;
-- append-only state packets under `.alignment-fab/state-packets/`;
-- append-only human decisions under `.alignment-fab/decisions/`;
-- contract pointers on workstreams, but no contract object or editor yet.
+- [x] Environment: Python 3.14 configured via `.python-version` and `.venv`;
+  tests pass with `uv run python -m unittest discover -s tests`.
+- [x] Rename: public command, package, docs, and default store now use `fab`.
+- [x] Registry skeleton: file-backed workstreams, live state, packets, human
+  judgments, links, and contract pointers.
+- [x] Contract skeleton: immutable Markdown version files, read-only attachment
+  lock, template, pointer validation, and tests.
+- [x] Artefact pointer skeleton: structured links to reports, logs, code,
+  datasets, prompts, model versions, and eval runs.
+- [x] Pilot fixture: simulated black-box-agent packets for a small
+  multi-workstream alignment programme.
+- [~] Research Protocol MVP: make the current skeleton express
+  `contract -> workstreams -> artefact packages -> brief -> human judgment`.
+- [ ] Workstream batch plan: represent coverage, diversity, replication,
+  critique, validation, and exploration.
+- [ ] Rich artefact package: claims, evidence, code, datasets, configs, logs,
+  uncertainty, failures, suggested follow-up, and provenance.
+- [ ] Batch comparison: surface convergence, contradictions, shared assumptions,
+  eval shortcuts, gaps, and replication needs.
+- [ ] Brief: produce the concise batch view a human researcher actually reads.
+- [ ] Human judgment record: capture what the researcher trusts, rejects, wants
+  replicated, escalates, prevents from propagating, or feeds into a revised
+  contract.
+- [ ] Knowledge substrate interface: allow contracts and workstreams to reference
+  prior knowledge and artefacts without turning Fab into a generic KB.
 
-The useful invariant is separation of concerns:
+Deferred:
 
-- the registry says what the workstream is;
-- the contract says what evidence and methods are admissible;
-- live state says what is happening now and why the workstream should continue;
-- packets and decisions explain how the state changed.
+- [ ] Promotion layer: controlled reuse of validated results across workstreams.
+- [ ] Full consolidation system: large-scale duplicate, contradiction, lineage,
+  and dependency analysis across many programmes.
+- [ ] UI/dashboard: only after the protocol loop is valuable in local form.
+
+Current focus: Research Protocol MVP.
 
 ## Product Target
 
-The system should let one human researcher lead many AI-assisted alignment
-workstreams without losing observability, judgment, or agenda control.
+Fab helps human alignment researchers oversee many thousands of autonomous agent
+contributions without owning the agent execution platform.
 
-It is not trying to be the agent runtime, the paper queue, or the experiment
-runner. Agent runtimes can remain external as long as they emit state packets,
-artifact links, and enough provenance for review.
+Fab owns the research protocol:
 
-The control surface should help answer:
+```text
+contract
+-> workstreams
+-> artefact packages
+-> brief
+-> human judgment
+```
 
-- What is each workstream trying to establish?
-- What changed since the last review?
-- Why is this workstream still worth running?
-- Which workstreams duplicate, contradict, block, or depend on each other?
-- Which outputs are local observations and which are safe to reuse?
-- What should continue, stop, merge, split, narrow, replicate, escalate, or be
-  promoted?
+External agent systems execute workstreams. Fab defines what context they
+receive, what outputs they must emit, how their outputs are compared, and how
+human judgment feeds the next contract or programme state.
+
+## Current State
+
+The repo contains a local, file-backed skeleton:
+
+- stable workstream records under `.fab/workstreams/`;
+- separate live-state records under `.fab/live-state/`;
+- append-only packets under `.fab/state-packets/`;
+- append-only human judgments under `.fab/decisions/`;
+- immutable Markdown contract versions under `.fab/contracts/`;
+- structured artefact references in packets and live state;
+- a simulated pilot fixture.
+
+The current code exposes `attention`, `show --brief`, and `judge` commands.
+They are still thin local skeletons for the protocol objects.
 
 ## Build Sequence
 
-### 0. Registry MVP
+### 0. Registry Skeleton
 
 Status: present.
 
-Keep this small and durable. The registry is the substrate every later layer
-points at.
+The registry gives durable identity to workstreams and preserves append-only
+history. It is the local substrate for the protocol objects.
 
 Useful hardening:
 
-- JSON schema or validation for workstream, live-state, packet, and decision
-  files;
-- stable CLI output for scripts and future UI;
-- migration story before persisted files start changing shape;
-- fixtures that demonstrate a small multi-workstream research program.
+- JSON schema or validation for persisted records;
+- stable JSON output for scripts and future UI;
+- migration story before persisted shapes change;
+- fixtures that demonstrate complete protocol loops.
 
 ### 1. Research Contracts
 
-Status: next build.
+Status: skeleton present.
 
-Contracts are the upstream primitive. A contract defines the rules of the
-workstream before results exist:
+Contracts are versioned delegation briefs. They should be brief enough that a
+busy research manager can write them, while giving external agents enough
+orientation to do useful autonomous work.
 
-- research question and why it matters;
-- prior claims and assumptions;
-- allowed methods and disallowed shortcuts;
-- progress criteria, failure criteria, and result criteria;
-- expected intermediate artifacts;
-- known traps and invalid evidence;
-- escalation triggers and stop conditions;
-- relationship to other workstreams.
+Required shape:
 
-Implementation shape:
+- research question;
+- why it matters;
+- free-form brief;
+- desired output;
+- optional programme shape;
+- optional context links to prior knowledge and artefacts;
+- optional attention boundaries known in advance.
 
-- store contracts under `.alignment-fab/contracts/`;
-- give each contract an id, version, status, and human approval fields;
-- support `create`, `show`, `validate`, `revise`, and `attach` flows;
-- keep workstreams pointing at a specific contract version.
+The contract should not try to precompute all methods, assumptions, traps, or
+failure criteria. Agents should investigate those and report what they find.
 
-### 2. Supervisor Review Loop
+### 2. Workstream Batch Plan
 
-Status: after contracts.
+Status: next.
 
-The first useful loop is not automation. It is a scan-and-decide workflow:
+A contract should be able to produce a batch of workstreams with deliberate
+coverage:
 
-- list stale, blocked, suspicious, or review-due workstreams;
-- show contract, live state, recent packets, decisions, deviations, and
-  artifacts together;
-- record human actions with rationale;
-- update status and review due dates from decisions.
+- exploratory attempts;
+- independent replications;
+- critique workstreams;
+- validation workstreams;
+- extensions of prior artefacts;
+- intentionally diverse method families or scaffolds.
 
-This is where `reason_for_continuing` becomes load-bearing. A workstream that
-cannot justify another unit of compute should be flagged for review.
+This is not execution scheduling. It is the research shape Fab asks an external
+agent system to instantiate.
 
-### 3. Artifact And Provenance Pointers
+### 3. Artefact Packages
 
-Status: after the review loop.
+Status: pointers present; packages next.
 
-The system should link to evidence without becoming an artifact warehouse:
+A workstream output should be a research artefact package, not just a report.
+The package should include:
 
-- reports, logs, code, plots, datasets, prompts, model versions, and eval runs;
-- provenance for generated data and changed code;
-- snapshots before private or sealed evaluation;
-- explicit references from claims to supporting artifacts.
+- claims;
+- evidence;
+- code, configs, scripts, notebooks, and patches;
+- datasets, prompts, evals, model identifiers, and run logs;
+- failed attempts;
+- uncertainty;
+- reproduction notes;
+- suggested follow-up;
+- provenance.
 
-### 4. Consolidation Pass
+This is where agent work becomes durable.
 
-Status: first agent-assisted layer.
+### 4. Batch Comparison
 
-A consolidation pass compares workstreams before final reports exist. It should
-surface:
+Status: not started.
 
-- duplicated effort;
-- contradictory results;
-- shared weak assumptions;
-- repeated method failures;
-- promising methods;
-- orphaned results;
-- claims with weak evidence;
-- areas with too much or too little activity.
+Before a human reads the batch, Fab should compare workstreams and surface:
 
-The output should be proposed interventions for human review, not automatic
-managerial action.
+- independent convergence;
+- contradictions;
+- shared assumptions;
+- repeated failures;
+- likely shortcuts;
+- eval leakage risk;
+- untested branches;
+- artefacts needing replication or critique.
 
-### 5. Promotion Layer
+This should be useful before a formal consolidation layer exists.
 
-Status: later.
+### 5. Brief And Human Judgment
 
-Promotion controls what becomes reusable outside a local workstream. A promoted
-result should include:
+Status: early placeholder present.
 
-- producing workstream and contract version;
-- prior claims it bears on;
-- replication or critique status;
-- assumptions and scope;
-- downstream workstreams allowed to depend on it;
-- what is explicitly not licensed by the result.
+The brief is the concise human-facing account of a batch. It should allocate
+attention and preserve enough evidence for inspection.
 
-Keep three decisions separate:
+Human judgment records what the researcher makes of the output:
 
-- Did the agent do valid local work?
-- Should this workstream continue?
-- Can others safely build on this result?
+- trusted as local evidence;
+- rejected;
+- interesting but unsupported;
+- needs replication;
+- needs critique;
+- escalate to human/manual review;
+- do not propagate;
+- usable as context for a later contract;
+- candidate for later promotion.
 
-### 6. Pilot Evaluation
+This judgment feeds the next contract version or programme state. It is not
+primarily a command to a specific agent.
 
-Status: target experiment.
+### 6. Knowledge Substrate Interface
 
-The first derisking experiment:
+Status: design only.
 
-> Can one researcher use contracts, consolidation, and a supervisor interface to
-> manage 50 parallel agent workstreams better than ordinary reports from 5-10
-> workstreams?
+Fab needs access to prior knowledge: previous experiments, artefacts, code,
+human judgments, papers, and research notes. The local `inwaves/kb` repo is a
+useful design reference, but Fab should not assume that all future deployments
+look like that repo.
 
-Measure whether the researcher can:
-
-- kill weak workstreams;
-- redirect confused ones;
-- identify duplicated effort;
-- catch invalid results;
-- select useful intermediate results;
-- decide what should be exposed to other agents or humans.
-
-Candidate pilot areas:
-
-- A3-style safety finetuning;
-- automated weak-to-strong experiments;
-- model-organism studies;
-- control-protocol experiments;
-- frontier-relative monitorability experiments.
+The interface should let contracts and workstreams reference prior knowledge,
+and let agent outputs propose updates, while leaving durable understanding under
+human judgment.
 
 ## Design Warnings
 
-These came up repeatedly in the KB research and should stay visible while
-building:
-
-- Managerial illusion: clean dashboards over shallow work.
-- Contract Goodharting: agents optimize for the contract rather than the
-  research need.
-- Self-certified progress: the same optimization process proposes, validates,
-  and narrates the claim.
-- Consolidation loss: compression hides the ambiguity that mattered.
-- Promotion laundering: local results become shared assumptions before their
-  scope is understood.
-- Research monoculture: parallel agents converge on easy-to-measure directions.
-- Human rubber-stamping: too many proposed interventions turn oversight
-  ceremonial.
-- Capability acceleration: automated alignment work may accelerate general AI
-  R&D more than alignment.
+- Clean structure can make shallow work look real.
+- Agents can optimize for easy-to-measure proxy progress.
+- A prose report can erase the dead ends and code details needed for replication.
+- A graph can become bookkeeping rather than knowledge.
+- Local results can become shared assumptions before their scope is understood.
+- Many agents can converge on the same fragile method family.
+- Too many proposed actions can turn human judgment into rubber-stamping.
 
 ## Immediate Next Actions
 
-1. Add contract data structures and validation.
-2. Add contract CLI commands and attach contract versions to workstreams.
-3. Create a sample `.alignment-fab` fixture with a small research program.
-4. Add review-oriented list filters: stale, blocked, flagged, review-due.
-5. Add a supervisor-oriented `show` view that puts contract, live state,
-   packets, decisions, and artifacts in one place.
+1. Add the workstream batch plan object.
+2. Expand artefact references toward artefact packages.
+3. Build a batch brief over the pilot fixture.
+4. Record human judgment on artefacts/claims rather than only workstream status.

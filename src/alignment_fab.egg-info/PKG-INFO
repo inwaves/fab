@@ -1,5 +1,0 @@
-Metadata-Version: 2.4
-Name: alignment-fab
-Version: 0.1.0
-Summary: Workstream registry MVP for human-supervised automated alignment research.
-Requires-Python: >=3.14

@@ -1,12 +1,12 @@
 [project]
-name = "alignment-fab"
+name = "fab"
 version = "0.1.0"
-description = "Workstream registry MVP for human-supervised automated alignment research."
+description = "Research protocol skeleton for agent-driven alignment work."
 requires-python = ">=3.14"
 dependencies = []
 
 [project.scripts]
-alignment-fab = "alignment_fab.cli:main"
+fab = "fab.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]

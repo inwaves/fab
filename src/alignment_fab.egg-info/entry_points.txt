@@ -1,2 +1,0 @@
-[console_scripts]
-alignment-fab = alignment_fab.cli:main
