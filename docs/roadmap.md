@@ -17,7 +17,7 @@ Legend: `[x] done`, `[~] in progress`, `[ ] not started`.
   datasets, prompts, model versions, and eval runs.
 - [x] Pilot fixture: simulated black-box-agent packets for a small
   multi-workstream alignment programme.
-- [x] Research Protocol MVP skeleton: make the current skeleton express
+- [x] Research Protocol MVP skeleton: make the current local skeleton express
   `contract -> workstreams -> artefact packages -> brief -> human judgment`.
 - [x] Rich artefact package skeleton: claims, evidence, code, datasets, configs, logs,
   uncertainty, failures, suggested follow-up, and provenance.
@@ -26,6 +26,8 @@ Legend: `[x] done`, `[~] in progress`, `[ ] not started`.
 - [x] Human judgment record: capture what the researcher trusts, rejects, wants
   replicated, escalates, prevents from propagating, or feeds into a revised
   contract, with targets on workstreams, artifacts, and claims.
+- [ ] Remote execution ingest boundary: accept completed run bundles from an
+  external execution platform without requiring agents to clone Fab.
 - [ ] Batch comparison: surface convergence, contradictions, shared assumptions,
   eval shortcuts, gaps, and replication needs.
 - [ ] Knowledge substrate interface: allow contracts and workstreams to reference
@@ -53,14 +55,16 @@ Fab owns the research protocol:
 ```text
 contract
 -> workstreams
+-> remote ingest
 -> artefact packages
 -> brief
 -> human judgment
 ```
 
-External agent systems execute workstreams. Fab defines what context they
-receive, what outputs agents must emit, how their outputs are compared, and how
-human judgment feeds the next contract or programme state.
+External agent systems execute workstreams. Fab defines what context agents
+receive, what output bundles they must emit, how those bundles are ingested, how
+their outputs are compared, and how human judgment feeds the next contract or
+programme state.
 
 ## Current State
 
@@ -78,6 +82,10 @@ The repo contains a local, file-backed skeleton:
 
 The current code exposes `attention`, `brief`, `show --brief`, and `judge`
 commands. They are still local skeletons for the protocol objects.
+
+The current code can register packets only through local CLI calls. The next
+boundary is an ingest adapter so agents can emit completed bundles to a local or
+object-store inbox while Fab remains the receiving ledger.
 
 ## Build Sequence
 
@@ -166,7 +174,52 @@ Human judgment records what the researcher makes of the output:
 This judgment feeds the next contract version or programme state. It is not
 primarily a command to a specific agent.
 
-### 4. Batch Comparison
+### 4. Remote Execution Ingest
+
+Status: design only.
+
+The Maestro branch proved that an external agent can produce useful Fab-shaped
+work: packets, claims, evidence, uncertainty, provenance, and artifacts. It did
+so by cloning Fab and calling `fab packet` directly. That should remain a test
+shortcut, not the production boundary.
+
+The intended boundary is:
+
+```text
+contract + context
+-> Podium or another execution platform
+-> completed run bundle
+-> Fab ingest adapter
+-> Fab registry
+```
+
+The agent should not need the Fab repo. It should receive:
+
+- the contract;
+- workstream context;
+- execution tools and environment;
+- the Fab output manifest schema.
+
+It should return:
+
+- `manifest.json` with packet fields;
+- artifact files or artifact URIs;
+- logs and provenance;
+- a completion marker such as `READY`.
+
+Initial build target:
+
+- `fab ingest-run --from <bundle>` for local bundle paths.
+
+Later build target:
+
+- `fab watch-inbox <uri>` for object-store or shared-directory inboxes.
+
+The watcher should reuse the same validation path as manual ingest. Fab should
+record artifact pointers and metadata; it should not assume research artifacts
+live inside the Fab framework repo.
+
+### 5. Batch Comparison
 
 Status: not started.
 
@@ -185,7 +238,7 @@ This should be useful before a formal consolidation layer exists. It should stay
 inside the brief path for now rather than becoming a separate fan-out or
 programme-shape component.
 
-### 5. Knowledge Substrate Interface
+### 6. Knowledge Substrate Interface
 
 Status: design only.
 
@@ -210,10 +263,12 @@ human judgment.
 
 ## Immediate Next Actions
 
-1. Improve comparison inside `fab brief`: convergence, contradictions, shared
+1. Add `fab ingest-run --from <bundle>` for completed local run bundles with a
+   manifest, artifacts, logs, and a `READY` marker.
+2. Improve comparison inside `fab brief`: convergence, contradictions, shared
    assumptions, repeated failures, shortcut risk, and replication needs.
-2. Turn `next_context` into a clearer bridge from judgments to the next contract
+3. Turn `next_context` into a clearer bridge from judgments to the next contract
    or context package.
-3. Add a thin prior-knowledge/reference interface, using `inwaves/kb` as an
+4. Add a thin prior-knowledge/reference interface, using `inwaves/kb` as an
    example but not as the product boundary.
-4. Leave workstream fan-out/programme shape as a later design problem.
+5. Leave workstream fan-out/programme shape as a later design problem.

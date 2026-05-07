@@ -9,6 +9,7 @@ The core protocol is:
 ```text
 contract
 -> workstreams
+-> remote ingest
 -> artefact packages
 -> brief
 -> human judgment
@@ -38,6 +39,12 @@ local loop to work: contract, emitted artefacts, brief, and human judgment.
 
 Agents are temporary. Workstreams and artefacts are durable.
 
+Agents do not need the Fab repo in order to participate in the protocol. The
+normal path should be that an execution platform gives an agent the contract,
+workstream context, tools, and output schema. The agent returns a completed run
+bundle with a manifest and artifacts. Fab ingests that bundle and registers the
+packet.
+
 Each workstream should emit enough structure for later agents and humans to
 understand what happened:
 
@@ -51,6 +58,28 @@ understand what happened:
 - suggested follow-up.
 
 A prose report alone is not enough. The artefact package is the research output.
+
+## Remote Ingest
+
+The execution boundary is:
+
+```text
+agent / execution platform
+-> run bundle in local storage, object storage, or an inbox
+-> Fab ingest adapter
+-> state packet and live-state update
+```
+
+The Maestro branch proved the loop by letting an agent clone Fab and call
+`fab packet` directly. That is a useful test path, but not the intended
+architecture. In production, agents should write a Fab-compatible manifest and
+artifact files or URIs somewhere durable. Fab should watch or ingest those
+completed bundles.
+
+The first implementation should be an explicit command such as
+`fab ingest-run --from <bundle>`. A later watcher can poll an object-store inbox,
+but it should reuse the same validation path. See
+[Remote execution and ingest](remote-ingest.md).
 
 ## Artefact Packages To Brief
 

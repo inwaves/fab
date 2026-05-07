@@ -21,6 +21,7 @@ The stable protocol shape is:
 ```text
 contract
 -> workstreams
+-> remote ingest
 -> artefact packages
 -> brief
 -> human judgment
@@ -32,6 +33,7 @@ Fab can own the research protocol without owning the execution platform:
 - what agents must emit while working;
 - how artefacts, claims, evidence, code, failures, and provenance are packaged;
 - how outputs are summarized for human review;
+- how completed remote-agent bundles are ingested;
 - how human attention is allocated;
 - how human judgment feeds back into the next contract or programme state.
 
@@ -44,6 +46,8 @@ The implemented pieces are still modest:
 - **State packets**: append-only updates emitted by external agents or humans.
 - **Live state**: the latest known hypothesis, result, blocker, intended next
   step, flag, and rationale.
+- **Remote ingest boundary**: design target for accepting completed run bundles
+  from execution systems without requiring agents to clone Fab.
 - **Artefact packages**: structured references to reports, logs, plots, code,
   configs, datasets, prompts, models, evals, claims, evidence, failures,
   uncertainty, reproduction notes, and follow-up.
@@ -89,6 +93,12 @@ Fab is not currently:
 
 Execution stays external. Consolidation and promotion are deferred until the
 basic protocol loop is useful.
+
+Agents do not need Fab itself. In the intended remote-execution design, an
+agent receives a contract, workstream context, an execution platform, and an
+output manifest schema. It writes a completed run bundle to a local or
+object-store inbox. Fab ingests that bundle and records packet metadata,
+artifact pointers, claims, evidence, provenance, and uncertainty.
 
 ## Quick Start
 
@@ -144,6 +154,7 @@ uv run fab link ws_001 ws_002 --relationship related
 - [Roadmap](docs/roadmap.md)
 - [Research contracts](docs/contracts.md)
 - [Research protocol](docs/research-protocol.md)
+- [Remote execution and ingest](docs/remote-ingest.md)
 - [Brief and human judgment](docs/brief-and-judgment.md)
 - [Artefact and provenance pointers](docs/artifacts.md)
 - [Pilot fixture](docs/pilot-fixture.md)
@@ -158,6 +169,6 @@ uv run python -m unittest discover -s tests
 
 ## Next Build
 
-The next build target is to improve the MVP loop: better comparison inside the
-brief, a clearer way to turn judgments into the next contract/context, and a
-thin interface to prior knowledge without making Fab a general-purpose KB.
+The next build target is to add the ingest boundary: `fab ingest-run --from
+<bundle>` for completed agent run bundles, followed by better comparison inside
+the brief and a clearer way to turn judgments into the next contract/context.

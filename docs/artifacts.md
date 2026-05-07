@@ -10,6 +10,11 @@ and live state. It is still file-backed and local, but it now captures the parts
 needed for the MVP loop: claims, evidence, provenance, uncertainty,
 reproduction notes, failures, and follow-up.
 
+For remote execution, artifact contents should usually live outside the Fab
+framework repo: in an execution-platform artifact store, a shared filesystem, an
+object-store prefix, or a content-addressed store. Fab records pointers and
+metadata. It should not assume that `runs/` is inside this repository.
+
 ## Why This Exists
 
 Fab should make agent research cumulative. That requires more than summaries:
@@ -99,6 +104,11 @@ The current package is deliberately simple. Later this may become a directory,
 manifest, database record, external object, or a richer bundle with patches,
 notebooks, checkpoints, tables, plots, and generated data. Fab should care about
 the protocol shape, not one storage backend.
+
+Remote-ingest manifests should be allowed to use stable artifact URIs, for
+example `s3://...`, `gs://...`, `https://...`, or content-addressed references.
+The current CLI uses `path`; the ingest boundary should normalize either local
+paths or remote URIs into the registry's artifact pointer shape.
 
 ## CLI
 

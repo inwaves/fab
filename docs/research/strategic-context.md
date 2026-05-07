@@ -20,6 +20,7 @@ The settled protocol is:
 ```text
 contract
 -> workstreams
+-> remote ingest
 -> artefact packages
 -> brief
 -> human judgment
@@ -30,9 +31,15 @@ Fab does not own the agent platform. It owns the research interface:
 - which contract a workstream is answering;
 - what prior knowledge and artefacts agents receive;
 - what agents must emit;
+- how completed run bundles are ingested from the execution platform;
 - how outputs are summarized and, later, compared;
 - how human attention is allocated;
 - how human judgment feeds the next contract, batch, or programme state.
+
+The agent does not need the Fab repo. The execution platform gives it contract
+context and tools; the agent emits a run bundle with a manifest, artifacts,
+logs, provenance, claims, evidence, failures, and uncertainty. Fab validates and
+registers that bundle.
 
 ## Knowledge Substrate
 
