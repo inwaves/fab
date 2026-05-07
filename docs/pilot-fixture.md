@@ -6,8 +6,8 @@ building an execution harness. It is meant to test the first Fab protocol loop:
 ```text
 contract
 -> workstreams
--> artefact pointers
--> attention queue
+-> artefact packages
+-> brief
 -> human judgment
 ```
 
@@ -24,7 +24,8 @@ The command seeds an empty registry with:
 - one immutable research contract;
 - five workstreams in the `safety-finetuning-pilot` programme;
 - simulated packets from external agents;
-- structured artefact/provenance refs;
+- structured artefact packages with claims, evidence, provenance,
+  uncertainty, reproduction notes, and follow-up;
 - mixed attention states:
   - one clean workstream;
   - one blocked workstream;
@@ -49,6 +50,12 @@ Include the clean workstream too:
 uv run fab --store /tmp/fab-pilot attention --all
 ```
 
+Read the pilot brief:
+
+```bash
+uv run fab --store /tmp/fab-pilot brief --program safety-finetuning-pilot
+```
+
 Inspect a flagged workstream:
 
 ```bash
@@ -59,7 +66,9 @@ Record a human judgment:
 
 ```bash
 uv run fab --store /tmp/fab-pilot judge ws_003 \
-  --action replicate \
+  --target-type claim \
+  --target-id art_001/claim_filter_tradeoff \
+  --action needs-replication \
   --rationale "Promising but currently depends on one public eval and may be a shortcut"
 ```
 
@@ -72,5 +81,7 @@ whether the protocol objects carry the right information:
 - does the inspection view recover enough context from contract, packets, and
   artefacts?
 - do artefact/provenance refs make claims more inspectable?
-- does the fixture show where batch comparison and richer artefact packages are
-  needed next?
+- can a human judgment attach to a specific claim without pretending the whole
+  workstream is accepted or rejected?
+- does the fixture show where brief comparison and loop closure need to improve
+  next?

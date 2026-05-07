@@ -96,12 +96,39 @@ class RegistryStoreTest(unittest.TestCase):
                         "kind": "report",
                         "path": "runs/ws_001/baseline-report.md",
                         "description": "Baseline eval summary",
+                        "claims": [
+                            {
+                                "id": "claim_cluster",
+                                "text": "A baseline cluster is stable enough to inspect.",
+                                "confidence": "medium",
+                                "evidence": ["ev_stability"],
+                                "caveats": ["human labels are missing"],
+                            }
+                        ],
+                        "evidence": [
+                            {
+                                "id": "ev_stability",
+                                "kind": "metric",
+                                "summary": "Cluster assignments are stable across seeded runs.",
+                                "path": "runs/ws_001/stability.json",
+                            }
+                        ],
+                        "failed_attempts": ["unseeded run was too noisy"],
+                        "uncertainty": "not yet validated",
+                        "reproduction": {
+                            "commands": ["uv run python src/evals/refusal_eval.py"],
+                            "environment": ["python 3.12"],
+                            "notes": "uses a fixed seed",
+                        },
+                        "suggested_follow_up": ["human-label nearest neighbors"],
                         "provenance": {
                             "code": ["src/evals/refusal_eval.py"],
+                            "configs": ["configs/refusal_eval.toml"],
                             "datasets": ["data/refusal-benign-v1.jsonl"],
                             "models": ["qwen-8b-lora-run-003"],
                             "prompts": ["prompts/refusal-eval-v2.md"],
                             "evals": ["evals/refusal-fp-v1"],
+                            "outputs": ["runs/ws_001/baseline-report.md"],
                         },
                     }
                 ],
@@ -111,8 +138,110 @@ class RegistryStoreTest(unittest.TestCase):
             self.assertEqual(artifact["id"], "art_001")
             self.assertEqual(artifact["kind"], "report")
             self.assertEqual(artifact["description"], "Baseline eval summary")
+            self.assertEqual(artifact["claims"][0]["id"], "claim_cluster")
+            self.assertEqual(artifact["claims"][0]["evidence"], ["ev_stability"])
+            self.assertEqual(artifact["evidence"][0]["path"], "runs/ws_001/stability.json")
+            self.assertEqual(artifact["failed_attempts"], ["unseeded run was too noisy"])
+            self.assertEqual(artifact["uncertainty"], "not yet validated")
+            self.assertEqual(
+                artifact["reproduction"]["commands"],
+                ["uv run python src/evals/refusal_eval.py"],
+            )
+            self.assertEqual(artifact["suggested_follow_up"], ["human-label nearest neighbors"])
             self.assertEqual(artifact["provenance"]["code"], ["src/evals/refusal_eval.py"])
+            self.assertEqual(artifact["provenance"]["configs"], ["configs/refusal_eval.toml"])
             self.assertEqual(artifact["provenance"]["evals"], ["evals/refusal-fp-v1"])
+            self.assertEqual(artifact["provenance"]["outputs"], ["runs/ws_001/baseline-report.md"])
+
+    def test_decision_can_target_artifact_or_claim_without_changing_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = RegistryStore.at(Path(tmp))
+            store.create_workstream(title="A3 false-positive reduction", program="safety-finetuning")
+            store.add_state_packet(
+                "ws_001",
+                source="agent-a",
+                artifact_ref=[
+                    {
+                        "kind": "report",
+                        "path": "runs/ws_001/baseline-report.md",
+                        "claims": [
+                            {
+                                "id": "claim_cluster",
+                                "text": "A baseline cluster is stable enough to inspect.",
+                            }
+                        ],
+                    }
+                ],
+            )
+
+            artifact_decision = store.add_decision(
+                "ws_001",
+                action="needs-critique",
+                target_type="artifact",
+                target_id="art_001",
+                rationale="artifact is useful but needs a second pass",
+            )
+            claim_decision = store.add_decision(
+                "ws_001",
+                action="needs-replication",
+                target_type="claim",
+                target_id="art_001/claim_cluster",
+                rationale="claim is plausible but not ready as shared context",
+            )
+
+            self.assertEqual(artifact_decision["target"], {"type": "artifact", "id": "art_001"})
+            self.assertEqual(
+                claim_decision["target"],
+                {"type": "claim", "id": "art_001/claim_cluster"},
+            )
+            self.assertEqual(artifact_decision["status_after"], "planned")
+            self.assertEqual(claim_decision["status_after"], "planned")
+            self.assertEqual(store.get_workstream("ws_001")["status"], "planned")
+
+    def test_brief_summarizes_claims_attention_and_next_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = RegistryStore.at(Path(tmp))
+            store.create_workstream(title="A3 false-positive reduction", program="safety-finetuning")
+            store.add_state_packet(
+                "ws_001",
+                source="agent-a",
+                result="found a stable ambiguous-refusal cluster",
+                rationale="cluster is measurable enough to inspect",
+                artifact_ref=[
+                    {
+                        "kind": "report",
+                        "path": "runs/ws_001/baseline-report.md",
+                        "claims": [
+                            {
+                                "id": "claim_cluster",
+                                "text": "A baseline cluster is stable enough to inspect.",
+                                "confidence": "medium",
+                            }
+                        ],
+                        "evidence": ["seeded runs agree on cluster membership"],
+                    }
+                ],
+            )
+            store.add_decision(
+                "ws_001",
+                action="safe-as-context",
+                target_type="claim",
+                target_id="art_001/claim_cluster",
+                rationale="safe to include in the next research context with caveats",
+            )
+
+            brief = store.brief(program="safety-finetuning")
+
+            self.assertEqual(brief["counts"]["workstreams"], 1)
+            self.assertEqual(brief["counts"]["artifacts"], 1)
+            self.assertEqual(brief["counts"]["claims"], 1)
+            self.assertEqual(brief["claims"][0]["text"], "A baseline cluster is stable enough to inspect.")
+            self.assertEqual(brief["claims"][0]["judgments"][0]["action"], "safe-as-context")
+            self.assertIn("no_contract", brief["attention"][0]["reasons"])
+            self.assertEqual(
+                brief["next_context"]["safe_as_context"][0]["target"],
+                {"type": "claim", "id": "art_001/claim_cluster"},
+            )
 
     def test_decision_can_change_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

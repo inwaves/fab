@@ -27,10 +27,10 @@ contract
 
 Fab does not own the agent platform. It owns the research interface:
 
-- how a contract becomes a batch of workstreams;
+- which contract a workstream is answering;
 - what prior knowledge and artefacts agents receive;
 - what agents must emit;
-- how outputs are compared;
+- how outputs are summarized and, later, compared;
 - how human attention is allocated;
 - how human judgment feeds the next contract, batch, or programme state.
 

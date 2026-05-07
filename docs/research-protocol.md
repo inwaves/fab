@@ -20,9 +20,9 @@ execution. It is not a platform, scheduler, sandbox, or harness.
 ## Contract To Workstreams
 
 A contract states what the human wants investigated and why it matters. Fab
-then represents the intended research coverage as a workstream batch.
+then represents the resulting lines of work as workstreams.
 
-The batch plan is about research shape, not execution scheduling:
+Later Fab may need a better answer for workstream fan-out and programme shape:
 
 - exploration width;
 - desired mix of exploratory, replication, critique, validation, and extension
@@ -31,8 +31,8 @@ The batch plan is about research shape, not execution scheduling:
 - areas that should remain independent to preserve diverse evidence;
 - outputs that should be comparable across workstreams.
 
-The goal is to prevent a thousand agents from all doing the same obvious thing,
-without micromanaging how any one agent works.
+That is deliberately not part of the current MVP skeleton. First Fab needs the
+local loop to work: contract, emitted artefacts, brief, and human judgment.
 
 ## Workstreams To Artefact Packages
 
@@ -54,7 +54,8 @@ A prose report alone is not enough. The artefact package is the research output.
 
 ## Artefact Packages To Brief
 
-Fab compares outputs across a batch before the human reads them. The brief should
+The current MVP summarizes workstreams, artifacts, claims, attention reasons,
+judgments, and next-context buckets. As the brief improves, it should also
 surface:
 
 - convergence across independent workstreams;
@@ -83,7 +84,7 @@ The human judgment step decides what the researcher makes of the batch:
 - allow as context for a later contract;
 - mark as a candidate for later promotion.
 
-This judgment feeds the next contract version, workstream batch, or programme
+This judgment feeds the next contract version, future workstreams, or programme
 state. It is not primarily a command to an agent. The agents that produced the
 work may already be gone.
 

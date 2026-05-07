@@ -31,6 +31,12 @@ class PilotFixtureTest(unittest.TestCase):
             self.assertIn("no_contract", review_by_id["ws_005"])
             self.assertIn("no_state_packet", review_by_id["ws_005"])
 
+            brief = store.brief(program=PILOT_PROGRAM)
+            self.assertEqual(brief["counts"]["workstreams"], 5)
+            self.assertEqual(brief["counts"]["artifacts"], 4)
+            self.assertEqual(brief["counts"]["claims"], 4)
+            self.assertIn("claim_filter_tradeoff", {claim["id"] for claim in brief["claims"]})
+
     def test_seed_pilot_fixture_requires_empty_store(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = RegistryStore.at(Path(tmp))

@@ -1,6 +1,6 @@
 # Fab
 
-Fab is a "factory" for running AI safety research using agents. It aims to solve the information flow problem that occurs when there are thousands of agents running in parallel, and far fewer human researchers who can review their work.
+Fab is a "factory" for making sense of AI safety research done by agents. It aims to solve the information flow problem that occurs when there are thousands of agents running in parallel, and far fewer human researchers who can review their work.
 
 ## Building the case for fab
 
@@ -26,13 +26,12 @@ contract
 -> human judgment
 ```
 
-Fab can own the shape of the research programme without owning the execution
-platform:
+Fab can own the research protocol without owning the execution platform:
 
-- how a contract becomes a batch of workstreams;
+- which contract a workstream is answering;
 - what agents must emit while working;
 - how artefacts, claims, evidence, code, failures, and provenance are packaged;
-- how outputs are compared across a batch;
+- how outputs are summarized for human review;
 - how human attention is allocated;
 - how human judgment feeds back into the next contract or programme state.
 
@@ -45,8 +44,14 @@ The implemented pieces are still modest:
 - **State packets**: append-only updates emitted by external agents or humans.
 - **Live state**: the latest known hypothesis, result, blocker, intended next
   step, flag, and rationale.
-- **Artefact and provenance pointers**: structured references to reports, logs,
-  plots, code, datasets, prompts, models, and evals.
+- **Artefact packages**: structured references to reports, logs, plots, code,
+  configs, datasets, prompts, models, evals, claims, evidence, failures,
+  uncertainty, reproduction notes, and follow-up.
+- **Brief**: a compact human-facing view over workstreams, attention reasons,
+  artifacts, claims, judgments, and context that is safe or unsafe to carry
+  forward.
+- **Human judgments**: append-only rationale records that can target a
+  workstream, artifact, or claim.
 - **Attention queue**: a mechanical list of workstreams that look blocked,
   flagged, deviated, stale, unscoped, or due for human attention.
 - **Pilot fixture**: a simulated batch of black-box agent outputs for testing
@@ -93,6 +98,7 @@ This repo is pinned to Python 3.14 via `.python-version` and `pyproject.toml`.
 uv run fab init
 uv run fab pilot-fixture
 uv run fab attention
+uv run fab brief --program safety-finetuning-pilot
 uv run fab show ws_003 --brief
 ```
 
@@ -104,6 +110,7 @@ For an isolated pilot store:
 ```bash
 uv run fab --store /tmp/fab-pilot pilot-fixture
 uv run fab --store /tmp/fab-pilot attention
+uv run fab --store /tmp/fab-pilot brief --program safety-finetuning-pilot
 uv run fab --store /tmp/fab-pilot show ws_003 --brief
 ```
 
@@ -115,12 +122,15 @@ uv run fab pilot-fixture
 uv run fab create --title "..." --program "..." --owner "..."
 uv run fab list
 uv run fab attention
+uv run fab brief
+uv run fab brief --program safety-finetuning-pilot
 uv run fab show ws_001
 uv run fab show ws_001 --brief
 uv run fab attach-contract ws_001 --contract-id contract_001 --version 1
 uv run fab packet ws_001 --source agent-a --changed "..." --next "..." --rationale "..."
 uv run fab packet ws_001 --source agent-a --artifact-json '{"kind":"report","path":"runs/ws_001/baseline-report.md"}'
 uv run fab judge ws_001 --action replicate --rationale "..."
+uv run fab judge ws_001 --target-type claim --target-id art_001/claim_001 --action needs-replication --rationale "..."
 uv run fab judge ws_001 --action escalate --rationale "..." --next-attention-due-at 2026-05-10
 uv run fab link ws_001 ws_002 --relationship related
 ```
@@ -148,6 +158,6 @@ uv run python -m unittest discover -s tests
 
 ## Next Build
 
-The next build target is the Research Protocol MVP: represent a workstream batch
-plan, accept richer artefact packages, produce a batch brief, and record human
-judgment in a way that can feed the next contract version.
+The next build target is to improve the MVP loop: better comparison inside the
+brief, a clearer way to turn judgments into the next contract/context, and a
+thin interface to prior knowledge without making Fab a general-purpose KB.

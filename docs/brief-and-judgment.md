@@ -5,12 +5,12 @@ not the whole product, and it is not a final report. It is the point in the Fab
 protocol where many emitted packets and artefacts become inspectable by a scarce
 human researcher.
 
-The current CLI exposes this through `attention`, `show --brief`, and `judge`.
+The current CLI exposes this through `brief`, `attention`, `show --brief`, and
+`judge`.
 The product concept is:
 
 ```text
 agent packets and artefact packages
--> batch comparison
 -> concise brief
 -> human judgment
 -> revised contract or programme state
@@ -51,10 +51,15 @@ Useful judgment states include:
 - safe to reference in a later contract;
 - candidate for later promotion.
 
-The current `judge` command is a thin placeholder for this layer. It records
-append-only human actions with rationale, and lifecycle actions still update
-workstream status mechanically. The next pass should make human judgment attach
-to artefacts and claims directly.
+The current `judge` command records append-only human actions with rationale.
+Judgments can target a workstream, artifact, or claim. Lifecycle actions still
+update workstream status only when the judgment target is the workstream.
+
+Judgment target ids:
+
+- workstream: `ws_001`
+- artifact: `art_001` or `ws_001/art_001`
+- claim: `claim_001`, `art_001/claim_001`, or `ws_001/art_001/claim_001`
 
 ## Current Commands
 
@@ -62,6 +67,14 @@ List workstreams that need attention:
 
 ```bash
 uv run fab attention
+```
+
+Produce the current human-facing brief:
+
+```bash
+uv run fab brief
+uv run fab brief --program safety-finetuning-pilot
+uv run fab brief --contract-id contract_pilot_a3_false_positive
 ```
 
 Filter by reason:
@@ -84,6 +97,26 @@ Record a human judgment:
 uv run fab judge ws_001 \
   --action replicate \
   --rationale "The result is promising but depends on one public eval and one scaffold"
+```
+
+Record judgment on a specific claim:
+
+```bash
+uv run fab judge ws_003 \
+  --target-type claim \
+  --target-id art_001/claim_filter_tradeoff \
+  --action needs-replication \
+  --rationale "Tradeoff may be a shortcut; do not carry forward before replication"
+```
+
+Mark a claim as usable in the next context:
+
+```bash
+uv run fab judge ws_001 \
+  --target-type claim \
+  --target-id art_001/claim_ambiguous_refusal_cluster \
+  --action safe-as-context \
+  --rationale "Safe to cite as a candidate cluster if the missing labels caveat is preserved"
 ```
 
 These commands support JSON output with `--json`.

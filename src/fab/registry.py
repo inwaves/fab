@@ -38,7 +38,35 @@ REVIEW_REASONS = {
     "invalid_contract_pointer",
 }
 TERMINAL_STATUSES = {"stopped", "completed"}
-ARTIFACT_PROVENANCE_FIELDS = ("code", "datasets", "models", "prompts", "evals")
+ARTIFACT_PROVENANCE_FIELDS = (
+    "code",
+    "configs",
+    "datasets",
+    "models",
+    "prompts",
+    "evals",
+    "logs",
+    "outputs",
+)
+VALID_DECISION_TARGET_TYPES = {"workstream", "artifact", "claim"}
+VALID_DECISION_ACTIONS = {
+    "continue",
+    "pause",
+    "stop",
+    "complete",
+    "quarantine",
+    "merge",
+    "split",
+    "replicate",
+    "escalate",
+    "promote",
+    "trust-local",
+    "reject",
+    "needs-replication",
+    "needs-critique",
+    "do-not-propagate",
+    "safe-as-context",
+}
 
 
 class RegistryError(Exception):
@@ -99,6 +127,16 @@ def contract_version_filename(version: int) -> str:
 def ensure_safe_id(kind: str, value: str) -> None:
     if not SAFE_ID_RE.fullmatch(value):
         raise RegistryError(f"invalid {kind}: {value}")
+
+
+def normalize_string_list(value: Any, *, label: str) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list):
+        raise RegistryError(f"{label} must be a list")
+    return [str(item) for item in value if item]
 
 
 @dataclass(frozen=True)
@@ -338,6 +376,98 @@ class RegistryStore:
             )
         return items
 
+    def brief(
+        self,
+        *,
+        program: str | None = None,
+        contract_id: str | None = None,
+        stale_days: int = 7,
+    ) -> dict[str, Any]:
+        self.ensure_ready()
+        if stale_days < 1:
+            raise RegistryError(f"invalid stale days: {stale_days}")
+        workstreams = self.list_workstreams(program=program)
+        if contract_id:
+            workstreams = [
+                entry
+                for entry in workstreams
+                if entry.get("contract", {}).get("id") == contract_id
+            ]
+
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        summaries = []
+        artifacts = []
+        claims = []
+        attention = []
+        decisions = []
+
+        for entry in workstreams:
+            workstream_id = entry["id"]
+            live_state = self.get_live_state(workstream_id)
+            packets = self.list_packets(workstream_id)
+            workstream_decisions = self.list_decisions(workstream_id)
+            review = review_summary(self, entry, live_state, packets, stale_days=stale_days, now=now)
+            if review["reasons"]:
+                attention.append(
+                    {
+                        "workstream_id": workstream_id,
+                        "title": entry.get("title"),
+                        "reasons": review["reasons"],
+                    }
+                )
+
+            summaries.append(
+                {
+                    "id": workstream_id,
+                    "title": entry.get("title"),
+                    "status": entry.get("status"),
+                    "program": entry.get("program"),
+                    "contract": entry.get("contract"),
+                    "review": review,
+                    "next_intended_action": live_state.get("next_intended_action"),
+                    "rationale": live_state.get("rationale"),
+                    "results": live_state.get("results", []),
+                    "blockers": live_state.get("blockers", []),
+                    "flags": live_state.get("flags", []),
+                    "deviations": live_state.get("deviations", []),
+                }
+            )
+
+            decisions.extend(workstream_decisions)
+            for artifact in live_state.get("artifacts", []):
+                artifact_summary = brief_artifact_summary(workstream_id, artifact, workstream_decisions)
+                artifacts.append(artifact_summary)
+                for claim in artifact.get("claims", []):
+                    claims.append(
+                        brief_claim_summary(
+                            workstream_id,
+                            artifact,
+                            claim,
+                            workstream_decisions,
+                        )
+                    )
+
+        return {
+            "generated_at": now.isoformat().replace("+00:00", "Z"),
+            "filters": {
+                "program": program,
+                "contract_id": contract_id,
+                "stale_days": stale_days,
+            },
+            "counts": {
+                "workstreams": len(workstreams),
+                "attention": len(attention),
+                "artifacts": len(artifacts),
+                "claims": len(claims),
+                "decisions": len(decisions),
+            },
+            "attention": attention,
+            "workstreams": summaries,
+            "artifacts": artifacts,
+            "claims": claims,
+            "next_context": next_context_from_decisions(decisions),
+        }
+
     def set_status(self, workstream_id: str, status: str) -> dict[str, Any]:
         if status not in VALID_STATUSES:
             raise RegistryError(f"invalid status: {status}")
@@ -450,14 +580,25 @@ class RegistryStore:
         rationale: str,
         actor: str | None = None,
         next_review_due_at: str | None = None,
+        target_type: str = "workstream",
+        target_id: str | None = None,
     ) -> dict[str, Any]:
+        if action not in VALID_DECISION_ACTIONS:
+            valid = ", ".join(sorted(VALID_DECISION_ACTIONS))
+            raise RegistryError(f"invalid judgment action: {action}; valid: {valid}")
         if next_review_due_at is not None:
             parse_datetime(next_review_due_at)
         entry = self.get_workstream(workstream_id)
+        live_state = self.get_live_state(workstream_id)
+        target = normalize_decision_target(live_state, workstream_id, target_type, target_id)
         existing_decisions = [path.stem for path in (self.decisions_dir / workstream_id).glob("*.json")]
         decision_id = compact_id("dec", existing_decisions)
         status_before = entry.get("status")
-        status_after = status_after_for_action(action, status_before)
+        status_after = (
+            status_after_for_action(action, status_before)
+            if target["type"] == "workstream"
+            else status_before
+        )
         if status_after != status_before:
             entry["status"] = status_after
         if next_review_due_at is not None:
@@ -471,6 +612,7 @@ class RegistryStore:
             "created_at": utc_now(),
             "actor": actor,
             "action": action,
+            "target": target,
             "rationale": rationale,
             "status_before": status_before,
             "status_after": status_after,
@@ -609,6 +751,145 @@ def review_reasons(
     return reasons
 
 
+def brief_artifact_summary(
+    workstream_id: str,
+    artifact: dict[str, Any],
+    decisions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    artifact_id = artifact["id"]
+    return {
+        "workstream_id": workstream_id,
+        "id": artifact_id,
+        "kind": artifact.get("kind"),
+        "path": artifact.get("path"),
+        "description": artifact.get("description"),
+        "claims": len(artifact.get("claims", [])),
+        "evidence": len(artifact.get("evidence", [])),
+        "uncertainty": artifact.get("uncertainty"),
+        "review": artifact.get("review", {}),
+        "judgments": matching_decisions(
+            decisions,
+            target_type="artifact",
+            candidate_ids=[artifact_id, f"{workstream_id}/{artifact_id}"],
+        ),
+    }
+
+
+def brief_claim_summary(
+    workstream_id: str,
+    artifact: dict[str, Any],
+    claim: dict[str, Any],
+    decisions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    artifact_id = artifact["id"]
+    claim_id = claim["id"]
+    return {
+        "workstream_id": workstream_id,
+        "artifact_id": artifact_id,
+        "id": claim_id,
+        "ref": f"{artifact_id}/{claim_id}",
+        "text": claim.get("text"),
+        "confidence": claim.get("confidence"),
+        "evidence": claim.get("evidence", []),
+        "caveats": claim.get("caveats", []),
+        "judgments": matching_decisions(
+            decisions,
+            target_type="claim",
+            candidate_ids=[
+                claim_id,
+                f"{artifact_id}/{claim_id}",
+                f"{workstream_id}/{artifact_id}/{claim_id}",
+            ],
+        ),
+    }
+
+
+def matching_decisions(
+    decisions: list[dict[str, Any]],
+    *,
+    target_type: str,
+    candidate_ids: list[str],
+) -> list[dict[str, Any]]:
+    matches = []
+    for decision in decisions:
+        target = decision.get("target") or {"type": "workstream", "id": decision.get("workstream_id")}
+        if target.get("type") == target_type and target.get("id") in candidate_ids:
+            matches.append(decision)
+    return matches
+
+
+def next_context_from_decisions(decisions: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    context = {
+        "trusted_local": [],
+        "safe_as_context": [],
+        "needs_replication": [],
+        "needs_critique": [],
+        "do_not_propagate": [],
+    }
+    buckets = {
+        "trust-local": "trusted_local",
+        "safe-as-context": "safe_as_context",
+        "replicate": "needs_replication",
+        "needs-replication": "needs_replication",
+        "needs-critique": "needs_critique",
+        "reject": "do_not_propagate",
+        "do-not-propagate": "do_not_propagate",
+        "quarantine": "do_not_propagate",
+    }
+    for decision in decisions:
+        bucket = buckets.get(decision.get("action"))
+        if bucket:
+            context[bucket].append(
+                {
+                    "workstream_id": decision.get("workstream_id"),
+                    "target": decision.get("target"),
+                    "rationale": decision.get("rationale"),
+                    "decision_id": decision.get("id"),
+                }
+            )
+    return context
+
+
+def normalize_decision_target(
+    live_state: dict[str, Any],
+    workstream_id: str,
+    target_type: str,
+    target_id: str | None,
+) -> dict[str, str]:
+    if target_type not in VALID_DECISION_TARGET_TYPES:
+        valid = ", ".join(sorted(VALID_DECISION_TARGET_TYPES))
+        raise RegistryError(f"invalid judgment target type: {target_type}; valid: {valid}")
+    if target_type == "workstream":
+        if target_id and target_id != workstream_id:
+            raise RegistryError(f"workstream judgment target must be {workstream_id}")
+        return {"type": "workstream", "id": target_id or workstream_id}
+    if not target_id:
+        raise RegistryError(f"target id is required for {target_type} judgment")
+    if target_type == "artifact" and not artifact_target_exists(live_state, target_id):
+        raise RegistryError(f"artifact target not found: {target_id}")
+    if target_type == "claim" and not claim_target_exists(live_state, target_id):
+        raise RegistryError(f"claim target not found: {target_id}")
+    return {"type": target_type, "id": target_id}
+
+
+def artifact_target_exists(live_state: dict[str, Any], target_id: str) -> bool:
+    artifact_id = target_id.split("/")[-1]
+    return any(artifact.get("id") == artifact_id for artifact in live_state.get("artifacts", []))
+
+
+def claim_target_exists(live_state: dict[str, Any], target_id: str) -> bool:
+    parts = target_id.split("/")
+    artifact_id = parts[-2] if len(parts) >= 2 else None
+    claim_id = parts[-1]
+    for artifact in live_state.get("artifacts", []):
+        if artifact_id and artifact.get("id") != artifact_id:
+            continue
+        for claim in artifact.get("claims", []):
+            if claim.get("id") == claim_id:
+                return True
+    return False
+
+
 def artifact_ids(artifacts: list[Any]) -> list[str]:
     ids = []
     for artifact in artifacts:
@@ -679,8 +960,116 @@ def normalize_artifact_ref(
         "description": artifact.get("description"),
         "produced_by": artifact.get("produced_by") or source,
         "created_at": artifact.get("created_at") or created_at,
+        "claims": normalize_artifact_claims(artifact.get("claims")),
+        "evidence": normalize_artifact_evidence(artifact.get("evidence")),
+        "failed_attempts": normalize_string_list(
+            artifact.get("failed_attempts") or artifact.get("failures"),
+            label="artifact failed_attempts",
+        ),
+        "uncertainty": artifact.get("uncertainty"),
+        "reproduction": normalize_artifact_reproduction(artifact.get("reproduction")),
+        "suggested_follow_up": normalize_string_list(
+            artifact.get("suggested_follow_up") or artifact.get("follow_up"),
+            label="artifact suggested_follow_up",
+        ),
         "provenance": normalize_artifact_provenance(artifact.get("provenance")),
         "review": normalize_artifact_review(artifact.get("review")),
+    }
+
+
+def normalize_artifact_claims(claims: Any) -> list[dict[str, Any]]:
+    if claims is None:
+        return []
+    if isinstance(claims, str):
+        claims = [claims]
+    if not isinstance(claims, list):
+        raise RegistryError("artifact claims must be a list")
+
+    used_ids: list[str] = []
+    normalized = []
+    for claim in claims:
+        if isinstance(claim, str):
+            claim = {"text": claim}
+        if not isinstance(claim, dict):
+            raise RegistryError("artifact claim must be an object")
+        claim_id = str(claim.get("id") or compact_id("claim", used_ids))
+        ensure_safe_id("claim id", claim_id)
+        if claim_id in used_ids:
+            raise RegistryError(f"duplicate claim id: {claim_id}")
+        used_ids.append(claim_id)
+        text = claim.get("text") or claim.get("claim")
+        if not text:
+            raise RegistryError(f"artifact claim text is required: {claim_id}")
+        normalized.append(
+            {
+                "id": claim_id,
+                "text": str(text),
+                "confidence": claim.get("confidence"),
+                "evidence": normalize_string_list(
+                    claim.get("evidence") or claim.get("evidence_ids"),
+                    label=f"claim {claim_id} evidence",
+                ),
+                "caveats": normalize_string_list(
+                    claim.get("caveats"),
+                    label=f"claim {claim_id} caveats",
+                ),
+            }
+        )
+    return normalized
+
+
+def normalize_artifact_evidence(evidence: Any) -> list[dict[str, Any]]:
+    if evidence is None:
+        return []
+    if isinstance(evidence, str):
+        evidence = [evidence]
+    if not isinstance(evidence, list):
+        raise RegistryError("artifact evidence must be a list")
+
+    used_ids: list[str] = []
+    normalized = []
+    for item in evidence:
+        if isinstance(item, str):
+            item = {"summary": item}
+        if not isinstance(item, dict):
+            raise RegistryError("artifact evidence must be an object")
+        evidence_id = str(item.get("id") or compact_id("ev", used_ids))
+        ensure_safe_id("evidence id", evidence_id)
+        if evidence_id in used_ids:
+            raise RegistryError(f"duplicate evidence id: {evidence_id}")
+        used_ids.append(evidence_id)
+        summary = item.get("summary") or item.get("description") or item.get("text")
+        if not summary:
+            raise RegistryError(f"artifact evidence summary is required: {evidence_id}")
+        normalized.append(
+            {
+                "id": evidence_id,
+                "kind": item.get("kind") or "evidence",
+                "summary": str(summary),
+                "path": item.get("path"),
+                "refs": normalize_string_list(item.get("refs"), label=f"evidence {evidence_id} refs"),
+            }
+        )
+    return normalized
+
+
+def normalize_artifact_reproduction(reproduction: Any) -> dict[str, Any]:
+    if reproduction is None:
+        reproduction = {}
+    if isinstance(reproduction, str):
+        reproduction = {"notes": reproduction}
+    if not isinstance(reproduction, dict):
+        raise RegistryError("artifact reproduction must be an object")
+    return {
+        "commands": normalize_string_list(
+            reproduction.get("commands"),
+            label="artifact reproduction commands",
+        ),
+        "environment": normalize_string_list(
+            reproduction.get("environment"),
+            label="artifact reproduction environment",
+        ),
+        "notes": reproduction.get("notes"),
     }
 
 

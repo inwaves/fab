@@ -23,8 +23,9 @@ and propose methods rather than only execute a pre-specified plan.
 
 ## Programme Shape
 
-Optional. Describe the shape of the research batch Fab should ask an external
-agent system to instantiate.
+Optional and usually blank for the current MVP. Use this only if the human
+already knows useful research coverage constraints for an external agent system.
+Fab does not yet implement workstream fan-out or programme-shape planning.
 
 Examples:
 

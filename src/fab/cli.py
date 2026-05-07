@@ -7,7 +7,14 @@ from pathlib import Path
 from typing import Any
 
 from fab.pilot import seed_pilot_fixture
-from fab.registry import REVIEW_REASONS, RegistryError, RegistryStore, VALID_STATUSES
+from fab.registry import (
+    REVIEW_REASONS,
+    RegistryError,
+    RegistryStore,
+    VALID_DECISION_ACTIONS,
+    VALID_DECISION_TARGET_TYPES,
+    VALID_STATUSES,
+)
 
 
 DEFAULT_STORE = ".fab"
@@ -86,7 +93,7 @@ def print_review_detail(data: dict[str, Any]) -> None:
     print_list("blockers", live_state.get("blockers", []))
     print_list("deviations", live_state.get("deviations", []))
     print_list("flags", live_state.get("flags", []))
-    print_list("artifacts", live_state.get("artifacts", []))
+    print_artifacts_detail(live_state.get("artifacts", []))
 
     print("\nRecent Packets")
     packets = data.get("recent_packets", [])
@@ -106,10 +113,97 @@ def print_review_detail(data: dict[str, Any]) -> None:
         for decision in decisions:
             print(
                 f"- {decision['id']} {decision.get('created_at', '-')}: "
-                f"{decision.get('action')} -> {decision.get('status_after')}; "
+                f"{decision.get('action')} {decision_target_label(decision)} "
+                f"-> {decision.get('status_after')}; "
                 f"{decision.get('rationale')}"
             )
     else:
+        print("-")
+
+
+def print_brief(data: dict[str, Any]) -> None:
+    filters = data.get("filters", {})
+    counts = data.get("counts", {})
+    filter_bits = [
+        f"{key}={value}"
+        for key, value in filters.items()
+        if value is not None
+    ]
+    print(f"Fab brief\t{data.get('generated_at', '-')}\t{', '.join(filter_bits) or 'all'}")
+    print(
+        "counts\t"
+        f"workstreams={counts.get('workstreams', 0)}\t"
+        f"attention={counts.get('attention', 0)}\t"
+        f"artifacts={counts.get('artifacts', 0)}\t"
+        f"claims={counts.get('claims', 0)}\t"
+        f"decisions={counts.get('decisions', 0)}"
+    )
+
+    print("\nAttention")
+    attention = data.get("attention", [])
+    if attention:
+        for item in attention:
+            print(
+                f"- {item.get('workstream_id')}: "
+                f"{','.join(item.get('reasons', [])) or '-'}; "
+                f"{item.get('title', '')}"
+            )
+    else:
+        print("-")
+
+    print("\nWorkstreams")
+    workstreams = data.get("workstreams", [])
+    if workstreams:
+        for item in workstreams:
+            print(
+                f"- {item.get('id')}\t{item.get('status', '-')}\t"
+                f"{item.get('title', '')}"
+            )
+            if item.get("results"):
+                print(f"  result: {item['results'][-1]}")
+            if item.get("next_intended_action"):
+                print(f"  next: {item['next_intended_action']}")
+    else:
+        print("-")
+
+    print("\nClaims")
+    claims = data.get("claims", [])
+    if claims:
+        for claim in claims:
+            judgment_actions = [
+                str(decision.get("action"))
+                for decision in claim.get("judgments", [])
+                if decision.get("action")
+            ]
+            judgment_suffix = (
+                f" [{', '.join(judgment_actions)}]"
+                if judgment_actions
+                else ""
+            )
+            confidence = claim.get("confidence") or "-"
+            print(
+                f"- {claim.get('workstream_id')}/{claim.get('ref')} "
+                f"({confidence}){judgment_suffix}: {claim.get('text')}"
+            )
+    else:
+        print("-")
+
+    print("\nNext Context")
+    next_context = data.get("next_context", {})
+    printed = False
+    for bucket, items in next_context.items():
+        if not items:
+            continue
+        printed = True
+        print(f"{bucket}:")
+        for item in items:
+            target = item.get("target") or {}
+            print(
+                f"- {item.get('workstream_id')} "
+                f"{target.get('type', 'workstream')}:{target.get('id', '-')}; "
+                f"{item.get('rationale')}"
+            )
+    if not printed:
         print("-")
 
 
@@ -122,6 +216,44 @@ def print_list(label: str, values: list[Any]) -> None:
         print(f"- {format_list_value(value)}")
 
 
+def print_artifacts_detail(artifacts: list[dict[str, Any]]) -> None:
+    if not artifacts:
+        print("artifacts: -")
+        return
+
+    print("artifacts:")
+    for artifact in artifacts:
+        print(
+            f"- {artifact.get('id')} {artifact.get('kind', 'artifact')} "
+            f"{artifact.get('path', '-')}: {artifact.get('description') or '-'}"
+        )
+        if artifact.get("uncertainty"):
+            print(f"  uncertainty: {artifact['uncertainty']}")
+        claims = artifact.get("claims", [])
+        if claims:
+            print("  claims:")
+            for claim in claims:
+                confidence = claim.get("confidence") or "-"
+                print(f"  - {claim.get('id')} ({confidence}): {claim.get('text')}")
+                if claim.get("caveats"):
+                    print(f"    caveats: {', '.join(claim['caveats'])}")
+        evidence = artifact.get("evidence", [])
+        if evidence:
+            print("  evidence:")
+            for item in evidence:
+                path = f" {item['path']}" if item.get("path") else ""
+                print(
+                    f"  - {item.get('id')} {item.get('kind', 'evidence')}{path}: "
+                    f"{item.get('summary')}"
+                )
+        reproduction = artifact.get("reproduction") or {}
+        commands = reproduction.get("commands") or []
+        if commands:
+            print("  reproduce:")
+            for command in commands:
+                print(f"  - {command}")
+
+
 def format_list_value(value: Any) -> str:
     if isinstance(value, dict):
         if {"id", "kind", "path"}.issubset(value):
@@ -129,6 +261,13 @@ def format_list_value(value: Any) -> str:
             return f"{value['id']} {value['kind']} {value['path']}{description}"
         return json.dumps(value, sort_keys=True)
     return str(value)
+
+
+def decision_target_label(decision: dict[str, Any]) -> str:
+    target = decision.get("target")
+    if not target:
+        return f"workstream:{decision.get('workstream_id', '-')}"
+    return f"{target.get('type', 'workstream')}:{target.get('id', '-')}"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -174,6 +313,12 @@ def build_parser() -> argparse.ArgumentParser:
     attention.add_argument("--stale-days", type=int, default=7)
     attention.add_argument("--all", action="store_true", help="include workstreams with no attention reasons")
     attention.add_argument("--json", action="store_true")
+
+    brief = sub.add_parser("brief", help="summarize current work for human review")
+    brief.add_argument("--program")
+    brief.add_argument("--contract-id")
+    brief.add_argument("--stale-days", type=int, default=7)
+    brief.add_argument("--json", action="store_true")
 
     show = sub.add_parser("show", help="show one workstream with live state")
     show.add_argument("workstream_id")
@@ -222,19 +367,14 @@ def build_parser() -> argparse.ArgumentParser:
     judge.add_argument(
         "--action",
         required=True,
-        choices=[
-            "continue",
-            "pause",
-            "stop",
-            "complete",
-            "quarantine",
-            "merge",
-            "split",
-            "replicate",
-            "escalate",
-            "promote",
-        ],
+        choices=sorted(VALID_DECISION_ACTIONS),
     )
+    judge.add_argument(
+        "--target-type",
+        default="workstream",
+        choices=sorted(VALID_DECISION_TARGET_TYPES),
+    )
+    judge.add_argument("--target-id")
     judge.add_argument("--rationale", required=True)
     judge.add_argument("--actor")
     judge.add_argument("--next-attention-due-at", dest="next_review_due_at")
@@ -311,6 +451,15 @@ def main(argv: list[str] | None = None) -> int:
                     print_review_row(item)
             return 0
 
+        if args.command == "brief":
+            result = store.brief(
+                program=args.program,
+                contract_id=args.contract_id,
+                stale_days=args.stale_days,
+            )
+            print_json(result) if args.json else print_brief(result)
+            return 0
+
         if args.command == "show":
             result = store.show(args.workstream_id)
             if args.brief and not args.json:
@@ -372,6 +521,8 @@ def main(argv: list[str] | None = None) -> int:
                 rationale=args.rationale,
                 actor=args.actor,
                 next_review_due_at=args.next_review_due_at,
+                target_type=args.target_type,
+                target_id=args.target_id,
             )
             print_json(result) if args.json else print(f"Recorded {result['id']} for {args.workstream_id}")
             return 0

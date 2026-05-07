@@ -73,6 +73,10 @@ say, for example, that the external agent system should instantiate a broad
 exploratory batch, include independent replications, include critique
 workstreams, or separate exploration from validation.
 
+How Fab should represent programme shape and workstream fan-out is a later
+design question. It should not become another MVP component before the basic
+contract, artefact, brief, and judgment loop is useful.
+
 The contract should not include:
 
 - live state;

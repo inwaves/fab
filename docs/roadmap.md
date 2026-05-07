@@ -17,29 +17,31 @@ Legend: `[x] done`, `[~] in progress`, `[ ] not started`.
   datasets, prompts, model versions, and eval runs.
 - [x] Pilot fixture: simulated black-box-agent packets for a small
   multi-workstream alignment programme.
-- [~] Research Protocol MVP: make the current skeleton express
+- [x] Research Protocol MVP skeleton: make the current skeleton express
   `contract -> workstreams -> artefact packages -> brief -> human judgment`.
-- [ ] Workstream batch plan: represent coverage, diversity, replication,
-  critique, validation, and exploration.
-- [ ] Rich artefact package: claims, evidence, code, datasets, configs, logs,
+- [x] Rich artefact package skeleton: claims, evidence, code, datasets, configs, logs,
   uncertainty, failures, suggested follow-up, and provenance.
+- [x] Brief skeleton: produce a concise batch view with attention reasons,
+  artifacts, claims, judgments, and next-context buckets.
+- [x] Human judgment record: capture what the researcher trusts, rejects, wants
+  replicated, escalates, prevents from propagating, or feeds into a revised
+  contract, with targets on workstreams, artifacts, and claims.
 - [ ] Batch comparison: surface convergence, contradictions, shared assumptions,
   eval shortcuts, gaps, and replication needs.
-- [ ] Brief: produce the concise batch view a human researcher actually reads.
-- [ ] Human judgment record: capture what the researcher trusts, rejects, wants
-  replicated, escalates, prevents from propagating, or feeds into a revised
-  contract.
 - [ ] Knowledge substrate interface: allow contracts and workstreams to reference
   prior knowledge and artefacts without turning Fab into a generic KB.
 
 Deferred:
 
+- [ ] Workstream fan-out / programme shape: figure out only after the local MVP
+  brief and judgment loop is useful.
 - [ ] Promotion layer: controlled reuse of validated results across workstreams.
 - [ ] Full consolidation system: large-scale duplicate, contradiction, lineage,
   and dependency analysis across many programmes.
 - [ ] UI/dashboard: only after the protocol loop is valuable in local form.
 
-Current focus: Research Protocol MVP.
+Current focus: make the MVP loop genuinely useful, especially comparison in the
+brief and loop closure into the next context or contract.
 
 ## Product Target
 
@@ -57,7 +59,7 @@ contract
 ```
 
 External agent systems execute workstreams. Fab defines what context they
-receive, what outputs they must emit, how their outputs are compared, and how
+receive, what outputs agents must emit, how their outputs are compared, and how
 human judgment feeds the next contract or programme state.
 
 ## Current State
@@ -69,11 +71,13 @@ The repo contains a local, file-backed skeleton:
 - append-only packets under `.fab/state-packets/`;
 - append-only human judgments under `.fab/decisions/`;
 - immutable Markdown contract versions under `.fab/contracts/`;
-- structured artefact references in packets and live state;
+- structured artefact package references in packets and live state;
+- `brief` summaries over workstreams, artifacts, claims, judgments, attention
+  reasons, and next-context buckets;
 - a simulated pilot fixture.
 
-The current code exposes `attention`, `show --brief`, and `judge` commands.
-They are still thin local skeletons for the protocol objects.
+The current code exposes `attention`, `brief`, `show --brief`, and `judge`
+commands. They are still local skeletons for the protocol objects.
 
 ## Build Sequence
 
@@ -112,26 +116,9 @@ Required shape:
 The contract should not try to precompute all methods, assumptions, traps, or
 failure criteria. Agents should investigate those and report what they find.
 
-### 2. Workstream Batch Plan
+### 2. Artefact Packages
 
-Status: next.
-
-A contract should be able to produce a batch of workstreams with deliberate
-coverage:
-
-- exploratory attempts;
-- independent replications;
-- critique workstreams;
-- validation workstreams;
-- extensions of prior artefacts;
-- intentionally diverse method families or scaffolds.
-
-This is not execution scheduling. It is the research shape Fab asks an external
-agent system to instantiate.
-
-### 3. Artefact Packages
-
-Status: pointers present; packages next.
+Status: skeleton present.
 
 A workstream output should be a research artefact package, not just a report.
 The package should include:
@@ -148,29 +135,21 @@ The package should include:
 
 This is where agent work becomes durable.
 
-### 4. Batch Comparison
+### 3. Brief And Human Judgment
 
-Status: not started.
-
-Before a human reads the batch, Fab should compare workstreams and surface:
-
-- independent convergence;
-- contradictions;
-- shared assumptions;
-- repeated failures;
-- likely shortcuts;
-- eval leakage risk;
-- untested branches;
-- artefacts needing replication or critique.
-
-This should be useful before a formal consolidation layer exists.
-
-### 5. Brief And Human Judgment
-
-Status: early placeholder present.
+Status: skeleton present.
 
 The brief is the concise human-facing account of a batch. It should allocate
 attention and preserve enough evidence for inspection.
+
+The current skeleton summarizes:
+
+- workstream status, results, rationale, and next actions;
+- attention reasons;
+- artifacts and their claim/evidence counts;
+- claims and attached judgments;
+- targets that are trusted locally, safe as context, need replication, need
+  critique, or should not propagate.
 
 Human judgment records what the researcher makes of the output:
 
@@ -187,7 +166,26 @@ Human judgment records what the researcher makes of the output:
 This judgment feeds the next contract version or programme state. It is not
 primarily a command to a specific agent.
 
-### 6. Knowledge Substrate Interface
+### 4. Batch Comparison
+
+Status: not started.
+
+Before a human reads the batch, Fab should compare workstreams and surface:
+
+- independent convergence;
+- contradictions;
+- shared assumptions;
+- repeated failures;
+- likely shortcuts;
+- eval leakage risk;
+- untested branches;
+- artefacts needing replication or critique.
+
+This should be useful before a formal consolidation layer exists. It should stay
+inside the brief path for now rather than becoming a separate fan-out or
+programme-shape component.
+
+### 5. Knowledge Substrate Interface
 
 Status: design only.
 
@@ -212,7 +210,10 @@ human judgment.
 
 ## Immediate Next Actions
 
-1. Add the workstream batch plan object.
-2. Expand artefact references toward artefact packages.
-3. Build a batch brief over the pilot fixture.
-4. Record human judgment on artefacts/claims rather than only workstream status.
+1. Improve comparison inside `fab brief`: convergence, contradictions, shared
+   assumptions, repeated failures, shortcut risk, and replication needs.
+2. Turn `next_context` into a clearer bridge from judgments to the next contract
+   or context package.
+3. Add a thin prior-knowledge/reference interface, using `inwaves/kb` as an
+   example but not as the product boundary.
+4. Leave workstream fan-out/programme shape as a later design problem.
