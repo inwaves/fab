@@ -1,0 +1,100 @@
+{
+  "artifacts": [
+    {
+      "claims": [
+        {
+          "caveats": [
+            "nearest-neighbor labels still need human validation"
+          ],
+          "confidence": "medium",
+          "evidence": [
+            "ev_cluster_stability",
+            "ev_neighbor_sample"
+          ],
+          "id": "claim_ambiguous_refusal_cluster",
+          "text": "A stable ambiguous-refusal cluster appears in the baseline false-positive eval."
+        }
+      ],
+      "created_at": "2026-05-07T20:33:55Z",
+      "description": "Baseline cluster scan summary",
+      "evidence": [
+        {
+          "id": "ev_cluster_stability",
+          "kind": "metric",
+          "path": "runs/ws_001/cluster-stability.json",
+          "refs": [],
+          "summary": "Cluster membership is stable across three seeded eval passes."
+        },
+        {
+          "id": "ev_neighbor_sample",
+          "kind": "sample",
+          "path": "runs/ws_001/nearest-neighbors-30.jsonl",
+          "refs": [],
+          "summary": "Nearest-neighbor sample contains ambiguous compliance/refusal boundary cases."
+        }
+      ],
+      "failed_attempts": [],
+      "id": "art_001",
+      "kind": "report",
+      "path": "runs/ws_001/baseline-cluster-report.md",
+      "produced_by": "sim-agent-baseline",
+      "provenance": {
+        "code": [
+          "pilot/evals/refusal_false_positive_scan.py"
+        ],
+        "configs": [
+          "pilot/configs/ws_001.toml"
+        ],
+        "datasets": [
+          "pilot/data/benign_refusal_adjacent_v1.jsonl"
+        ],
+        "evals": [
+          "pilot/evals/refusal_fp_cluster_v1"
+        ],
+        "logs": [],
+        "models": [
+          "pilot-model-a3-lora-baseline"
+        ],
+        "outputs": [
+          "runs/ws_001/baseline-cluster-report.md",
+          "runs/ws_001/nearest-neighbors-30.jsonl"
+        ],
+        "prompts": [
+          "pilot/prompts/refusal_eval_v1.md"
+        ]
+      },
+      "reproduction": {
+        "commands": [
+          "uv run python pilot/evals/refusal_false_positive_scan.py --config pilot/configs/ws_001.toml"
+        ],
+        "environment": [
+          "python 3.12",
+          "seed=17"
+        ],
+        "notes": "Expected output is the cluster report plus nearest-neighbor sample."
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "label the 30 nearest neighbors before reusing this cluster as context"
+      ],
+      "uncertainty": "Human labels are missing, so this should be treated as a candidate cluster rather than a validated failure pattern."
+    }
+  ],
+  "blockers": [],
+  "changed": null,
+  "created_at": "2026-05-07T20:33:55Z",
+  "deviations": [],
+  "failed": null,
+  "flags": [],
+  "id": "pkt_001",
+  "next_action": "sample 30 nearest neighbors and label whether they are true false positives",
+  "rationale": "cluster is measurable, reproducible, and directly tied to the contract question",
+  "result": "found a stable cluster around ambiguous compliance/refusal boundaries",
+  "source": "sim-agent-baseline",
+  "tried": "ran baseline false-positive eval over benign refusal-adjacent prompts",
+  "workstream_id": "ws_001"
+}

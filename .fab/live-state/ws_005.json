@@ -1,0 +1,17 @@
+{
+  "artifacts": [],
+  "blockers": [],
+  "current_hypothesis": null,
+  "current_plan": null,
+  "deviations": [],
+  "experiments": [],
+  "failed_attempts": [],
+  "flags": [],
+  "id": "state_ws_005",
+  "next_intended_action": null,
+  "rationale": null,
+  "resource_usage": {},
+  "results": [],
+  "updated_at": null,
+  "workstream_id": "ws_005"
+}

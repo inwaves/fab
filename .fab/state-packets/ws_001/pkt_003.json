@@ -1,0 +1,212 @@
+{
+  "artifacts": [
+    {
+      "claims": [
+        {
+          "caveats": [
+            "Sample size depends on the precision target. n=100 is sized for a roughly +/-0.10 half-width at p=0.5; smaller half-widths require larger n."
+          ],
+          "confidence": "high",
+          "evidence": [
+            "ev_wilson_n_table"
+          ],
+          "id": "claim_n30_too_imprecise",
+          "text": "n=30 yields a 95% Wilson half-width of about 0.18 at p=0.5. That is too imprecise to publish a single FP-rate number from. Recommend committing to n=100 for the headline estimate and using n=30 only as a fast first pass to validate the rubric."
+        },
+        {
+          "caveats": [],
+          "confidence": "high",
+          "evidence": [
+            "ev_stratification_argument"
+          ],
+          "id": "claim_tier_b_required",
+          "text": "Without an off-cluster Tier B comparator, the labels measure within-cluster FP rate only and cannot distinguish 'the cluster is a real over-refusal hotspot' from 'the model over-refuses everywhere on this distribution'. Recommend stratified sampling (Tier A: 50 in-cluster, Tier B: 50 off-cluster)."
+        },
+        {
+          "caveats": [],
+          "confidence": "high",
+          "evidence": [
+            "ev_decision_rules_section",
+            "ev_label_ci_implementation"
+          ],
+          "id": "claim_use_difference_ci",
+          "text": "The pre-registered distinguishability rule uses the 95% CI on the A-minus-B difference (Newcombe hybrid score), not overlap of the two tier CIs. CI overlap is a conservative and unreliable substitute for a difference test."
+        },
+        {
+          "caveats": [],
+          "confidence": "medium",
+          "evidence": [
+            "ev_rubric_table"
+          ],
+          "id": "claim_rubric_requires_HR_class",
+          "text": "The rubric explicitly carves out hedged refusal (HR) as a separate class from compliance (C) and full refusal (FR). Collapsing HR into C or FR is the most common labeling shortcut and is the load-bearing rubric decision."
+        }
+      ],
+      "created_at": "2026-05-07T20:46:33Z",
+      "description": "Pre-registered labeling plan for ws_001's planned 30-NN false-positive labeling pass. Locks rubric, sample sizes, stratification, IAA, adjudication, and decision rules before any prompt is labeled.",
+      "evidence": [
+        {
+          "id": "ev_wilson_n_table",
+          "kind": "calculation",
+          "path": "runs/ws_001/external/prereg-labeling-plan.md",
+          "refs": [],
+          "summary": "Tabulated Wilson 95% half-widths at p=0.5 for n in {30,50,100,200,400}."
+        },
+        {
+          "id": "ev_stratification_argument",
+          "kind": "argument",
+          "path": "runs/ws_001/external/prereg-labeling-plan.md",
+          "refs": [],
+          "summary": "Without Tier B, observed Tier-A FP rate is non-identifiable as 'cluster effect' vs 'distribution effect'."
+        },
+        {
+          "id": "ev_decision_rules_section",
+          "kind": "argument",
+          "path": "runs/ws_001/external/prereg-labeling-plan.md",
+          "refs": [],
+          "summary": "Decision rule uses 95% CI on (Tier A - Tier B) excluding/including 0; explicit warning against using CI overlap as a substitute for a difference test."
+        },
+        {
+          "id": "ev_label_ci_implementation",
+          "kind": "code",
+          "path": "runs/ws_001/external/label_ci.py",
+          "refs": [],
+          "summary": "Standalone Python implementation of Wilson CI per tier and Newcombe hybrid score CI for the A-minus-B difference. Smoke-tested on synthetic data."
+        },
+        {
+          "id": "ev_rubric_table",
+          "kind": "rubric",
+          "path": "runs/ws_001/external/prereg-labeling-plan.md",
+          "refs": [],
+          "summary": "Five-class output rubric (C, PC, Q, HR, FR) with HR and FR as the two FP-counting classes; binary FP label is derived, not directly assigned."
+        }
+      ],
+      "failed_attempts": [
+        "Could not run the protocol end-to-end: no raters, no model outputs, no access to benign_refusal_adjacent_v1.jsonl in this clone. The plan is therefore a pre-registration, not an empirical artifact."
+      ],
+      "id": "art_external_prereg_plan_001",
+      "kind": "report",
+      "path": "runs/ws_001/external/prereg-labeling-plan.md",
+      "produced_by": "remote-agent-maestro",
+      "provenance": {
+        "code": [
+          "runs/ws_001/external/label_ci.py"
+        ],
+        "configs": [],
+        "datasets": [],
+        "evals": [],
+        "logs": [],
+        "models": [],
+        "outputs": [
+          "runs/ws_001/external/prereg-labeling-plan.md",
+          "runs/ws_001/external/label_ci.py"
+        ],
+        "prompts": []
+      },
+      "reproduction": {
+        "commands": [
+          "less runs/ws_001/external/prereg-labeling-plan.md",
+          "uv run python runs/ws_001/external/label_ci.py path/to/labels.jsonl",
+          "uv run python runs/ws_001/external/label_ci.py path/to/labels.jsonl --json"
+        ],
+        "environment": [
+          "python 3.14",
+          "no third-party packages required"
+        ],
+        "notes": "The script accepts a JSONL of {is_false_positive: bool, tier: 'A'|'B'} records. Output gives per-tier Wilson 95% CIs and the Newcombe difference CI."
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "Lock this file at the current commit before any item is labeled. Any subsequent change must be recorded as a state packet with --deviation.",
+        "ws_001 packet: report inter-annotator kappa on output_class restricted to items where both raters agreed prompt_is_benign=yes.",
+        "ws_001 packet: report Tier A and Tier B Wilson CIs and the Newcombe difference CI; do not collapse the tiers for the headline number.",
+        "Cross-reference with the over-refusal literature index before treating any item as benign: see runs/ws_001/external/lit-index-overrefusal.md."
+      ],
+      "uncertainty": "The plan does not eliminate the embedding-tautology risk identified in pkt_002's critique. Even with a tight A-minus-B CI, that result is consistent with both 'real prompt-distribution hotspot' and 'the model's own refusal axis was used as the embedding'. The two follow-ups are independent."
+    },
+    {
+      "claims": [
+        {
+          "caveats": [
+            "Smoke test is a sanity check, not a numerical validation against a reference statistical package."
+          ],
+          "confidence": "high",
+          "evidence": [
+            "ev_smoke_run"
+          ],
+          "id": "claim_script_smoke_tested",
+          "text": "label_ci.py runs end-to-end on a synthetic 10-row JSONL; produces sensible Wilson and Newcombe outputs (e.g., 3/5 -> 0.600 [0.231, 0.882]; A-B = +0.400 [-0.163, +0.726])."
+        }
+      ],
+      "created_at": "2026-05-07T20:46:33Z",
+      "description": "Standalone Python (stdlib only) Wilson CI per tier + Newcombe hybrid score CI for the A-minus-B difference, used by the pre-registered labeling plan.",
+      "evidence": [
+        {
+          "id": "ev_smoke_run",
+          "kind": "console_log",
+          "path": null,
+          "refs": [],
+          "summary": "Ran 'uv run python runs/ws_001/external/label_ci.py /tmp/wstest/labels.jsonl' on a 10-row synthetic JSONL; got per-tier Wilson CIs and Newcombe difference CI consistent with hand calculation."
+        }
+      ],
+      "failed_attempts": [],
+      "id": "art_external_label_ci_001",
+      "kind": "code",
+      "path": "runs/ws_001/external/label_ci.py",
+      "produced_by": "remote-agent-maestro",
+      "provenance": {
+        "code": [
+          "runs/ws_001/external/label_ci.py"
+        ],
+        "configs": [],
+        "datasets": [],
+        "evals": [],
+        "logs": [],
+        "models": [],
+        "outputs": [
+          "runs/ws_001/external/label_ci.py"
+        ],
+        "prompts": []
+      },
+      "reproduction": {
+        "commands": [
+          "echo '{\"is_false_positive\": true, \"tier\": \"A\"}' > /tmp/x.jsonl",
+          "uv run python runs/ws_001/external/label_ci.py /tmp/x.jsonl"
+        ],
+        "environment": [
+          "python 3.14"
+        ],
+        "notes": null
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "Add a numerical-equivalence test against statsmodels.stats.proportion.proportion_confint (method='wilson').",
+        "Add a small unit test under tests/ that locks expected CIs at known (k, n) for regression."
+      ],
+      "uncertainty": "Numerical agreement with R's binom.wilson and prop.test newcombe-modified intervals is by formula match, not by independent benchmark. A formal numerical-equivalence test against statsmodels.stats.proportion would harden this."
+    }
+  ],
+  "blockers": [],
+  "changed": null,
+  "created_at": "2026-05-07T20:46:33Z",
+  "deviations": [],
+  "failed": "Could not run the protocol end-to-end: no raters, no model outputs, no access to benign_refusal_adjacent_v1.jsonl in this clone. The plan is a pre-registration, not an empirical artifact.",
+  "flags": [
+    "F11-operational-definition-not-yet-locked: ws_001 has a 'next intended action' to label but no rubric or operational definition on file. This packet supplies one as a pre-registration; it must be locked before labels are revealed."
+  ],
+  "id": "pkt_003",
+  "next_action": "Hand the pre-registration to the human researcher and lock it before any item is labeled. Any subsequent change must be recorded as a state packet with --deviation. Then run the labeling pass and emit a follow-up packet reporting kappa and the per-tier + difference CIs.",
+  "rationale": "Locking rubric, sample size, stratification, and decision rules before labels eliminates several degrees of freedom that would otherwise turn the labeling step into a weak-label problem. The contract explicitly asks us to flag weak labels; pre-registration is the cheapest mitigation.",
+  "result": "n=30 yields ~0.18 Wilson half-width at p=0.5, too imprecise to publish a single FP-rate number from. Recommend committing to n=100 stratified across Tier A and Tier B; use n=30 only as a fast first pass to validate the rubric. Pre-registered decision rule uses 95% CI on (A FP rate - B FP rate) excluding/including 0. Calculator script ran end-to-end (tier A 3/5=0.600 [0.231,0.882]; tier B 1/5=0.200 [0.036,0.624]; A-B=+0.400 [-0.163,+0.726]).",
+  "source": "remote-agent-maestro",
+  "tried": "Designed a pre-registered labeling plan for the next intended action of ws_001 ('sample 30 nearest neighbors and label whether they are true false positives'). Wrote a five-class output rubric (C/PC/Q/HR/FR), tabulated Wilson 95% half-widths for n in {30,50,100,200,400}, specified Tier A (cluster) vs Tier B (off-cluster) stratification, fixed inter-annotator kappa threshold (>=0.6), and locked the analysis decision rule to use the Newcombe difference CI rather than CI overlap. Implemented the Wilson + Newcombe interval calculator as a stdlib-only Python script and smoke-tested it on a 10-row synthetic JSONL.",
+  "workstream_id": "ws_001"
+}

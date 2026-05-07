@@ -1,0 +1,131 @@
+{
+  "artifacts": [
+    {
+      "claims": [
+        {
+          "caveats": [
+            "Structural risk argument, not a measured intersection. An actual training-data intersection scan would be a follow-up workstream."
+          ],
+          "confidence": "medium",
+          "evidence": [
+            "ev_xstest_age",
+            "ev_orbench_age"
+          ],
+          "id": "claim_public_benchmarks_are_leakage_suspect",
+          "text": "By 2026, XSTest (2308.01263) and OR-Bench's hard 1k subset (2405.20947) have circulated long enough that any safety-tuned model trained on broad public mixes plausibly saw them. Treat them as known to the field, and do not use them as primary FP-reduction metrics for any model that may have ingested them."
+        },
+        {
+          "caveats": [],
+          "confidence": "high",
+          "evidence": [
+            "ev_dataset_path_only_in_provenance"
+          ],
+          "id": "claim_pilot_dataset_overlap_unknown",
+          "text": "Whether pilot/data/benign_refusal_adjacent_v1.jsonl overlaps with any of XSTest, OR-Bench, or PHTest is not knowable from this clone. The labeling protocol's primary FP-rate statistic should exclude any item that is a paraphrase or near-duplicate of a public benchmark prompt."
+        },
+        {
+          "caveats": [],
+          "confidence": "medium",
+          "evidence": [
+            "ev_oktest_unverified"
+          ],
+          "id": "claim_oktest_unverified",
+          "text": "OKTest is referenced in the PHTest paper as a smaller prior dataset for false refusals, but its arXiv ID, year, authors, and size could not be confirmed in this research session. Do not cite OKTest from this index until a human researcher verifies the primary source."
+        }
+      ],
+      "created_at": "2026-05-07T20:47:03Z",
+      "description": "Indexed catalog of public over-refusal / false-positive benchmarks (XSTest, OR-Bench, PHTest, SORRY-Bench, WildJailbreak, HEx-PHI) with arXiv IDs and qualitative leakage-risk notes.",
+      "evidence": [
+        {
+          "id": "ev_xstest_age",
+          "kind": "citation",
+          "path": "runs/ws_001/external/lit-index-overrefusal.md",
+          "refs": [],
+          "summary": "Roettger et al., XSTest (arXiv:2308.01263, NAACL 2024). Public on HF and GitHub since 2023; 250 safe prompts + 200 unsafe contrasts."
+        },
+        {
+          "id": "ev_orbench_age",
+          "kind": "citation",
+          "path": "runs/ws_001/external/lit-index-overrefusal.md",
+          "refs": [],
+          "summary": "Cui et al., OR-Bench (arXiv:2405.20947, ICLR 2025). 80k safe prompts + 1k hard subset + 600 toxic controls; HF/GitHub/leaderboard."
+        },
+        {
+          "id": "ev_dataset_path_only_in_provenance",
+          "kind": "registry_audit",
+          "path": ".fab/state-packets/ws_001/pkt_001.json",
+          "refs": [],
+          "summary": "ws_001 pkt_001 lists pilot/data/benign_refusal_adjacent_v1.jsonl in provenance.datasets but no overlap report exists in the registry."
+        },
+        {
+          "id": "ev_oktest_unverified",
+          "kind": "search_result",
+          "path": ".maestro/perplexity/xstest_phtest_details.md",
+          "refs": [],
+          "summary": "Targeted search returned no verified arXiv ID, authors, year, or size for OKTest; only indirect references in the PHTest paper."
+        }
+      ],
+      "failed_attempts": [
+        "Could not cross-reference the contract's KB pointers (papers/a3-an-automated-alignment-agent-for-safety-finetun.md, papers/automated-weak-to-strong-researcher.md, papers/the-last-human-written-paper-agent-native-research-artifacts.md) because they are not present in this clone of inwaves/fab. They presumably live in inwaves/kb.",
+        "Did not perform a training-data intersection scan: would require access to the pilot model's training mix and the benchmark items in a comparable form."
+      ],
+      "id": "art_external_lit_index_001",
+      "kind": "report",
+      "path": "runs/ws_001/external/lit-index-overrefusal.md",
+      "produced_by": "remote-agent-maestro",
+      "provenance": {
+        "code": [],
+        "configs": [],
+        "datasets": [],
+        "evals": [],
+        "logs": [
+          ".maestro/perplexity/overrefusal_benchmarks_2025.md",
+          ".maestro/perplexity/xstest_phtest_details.md"
+        ],
+        "models": [],
+        "outputs": [
+          "runs/ws_001/external/lit-index-overrefusal.md"
+        ],
+        "prompts": []
+      },
+      "reproduction": {
+        "commands": [
+          "less runs/ws_001/external/lit-index-overrefusal.md",
+          "less .maestro/perplexity/overrefusal_benchmarks_2025.md",
+          "less .maestro/perplexity/xstest_phtest_details.md"
+        ],
+        "environment": [
+          "network access to confirm citations"
+        ],
+        "notes": null
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "Human verification of arXiv IDs, sizes, venues, and any 2025-2026 over-refusal benchmark additions.",
+        "Open a sibling ws to perform an intersection scan between benign_refusal_adjacent_v1.jsonl and {XSTest, OR-Bench, PHTest} prompts.",
+        "Attach inwaves/kb (or equivalent) to fab so the contract's KB references are resolvable from the registry surface."
+      ],
+      "uncertainty": "Benchmark metadata may have shifted between research sessions and 2026; readers should re-verify before quoting venue/size. New 2025-2026 benchmarks not in the search results may exist."
+    }
+  ],
+  "blockers": [],
+  "changed": null,
+  "created_at": "2026-05-07T20:47:03Z",
+  "deviations": [],
+  "failed": "Could not cross-reference the contract's three KB papers (a3-..., automated-weak-to-strong-researcher, the-last-human-written-paper). They are not present in this clone of inwaves/fab; they presumably live in inwaves/kb. No training-data intersection scan performed: would require access to the pilot model's training mix and the benchmark items in a comparable form.",
+  "flags": [
+    "F8-public-metric-shortcutting-risk: by 2026 XSTest and OR-Bench's hard 1k subset are leakage-suspect for any model trained on broad public mixes; do not use as primary FP-reduction metrics for the pilot model without a held-out distribution.",
+    "missing-kb-pointer: the contract's three KB references (papers/...) are not resolvable from this clone of inwaves/fab; cross-referencing is deferred until a kb substrate is attached."
+  ],
+  "id": "pkt_004",
+  "next_action": "Human verification of arXiv IDs, sizes, venues, and any 2025-2026 over-refusal benchmark additions. Open a sibling workstream that performs an intersection scan between benign_refusal_adjacent_v1.jsonl and {XSTest, OR-Bench, PHTest} prompts. Attach inwaves/kb (or equivalent) to fab so the contract's KB references resolve.",
+  "rationale": "The contract explicitly asks us to flag public-metric shortcutting and private-eval leakage. Without a leakage-aware comparator, any reported FP-rate change against a public benchmark is ambiguous. The literature index is the cheapest input that makes that ambiguity visible to the human researcher.",
+  "result": "Six entries verified: XSTest (2308.01263, NAACL 2024), OR-Bench (2405.20947, ICLR 2025), PHTest (2409.00598), SORRY-Bench (2406.14598, ICLR 2025), WildJailbreak (related, not a direct FP benchmark), HEx-PHI (harmful-side, listed only to avoid confusion). OKTest could not be confirmed beyond an indirect mention in PHTest. By 2026 XSTest and OR-Bench's hard 1k subset have circulated long enough to be leakage-suspect for any model trained on broad public mixes.",
+  "source": "remote-agent-maestro",
+  "tried": "Compiled a structured literature index of public over-refusal / false-positive benchmarks (XSTest, OR-Bench, PHTest, SORRY-Bench, WildJailbreak, HEx-PHI) with arXiv IDs and qualitative leakage-risk notes. Anchored the citations against two targeted searches (saved under .maestro/perplexity/). Cross-checked which entries could be confirmed and explicitly marked OKTest as unverified. Audited the contract's KB references for resolvability from this clone.",
+  "workstream_id": "ws_001"
+}

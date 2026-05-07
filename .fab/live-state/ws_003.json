@@ -1,0 +1,100 @@
+{
+  "artifacts": [
+    {
+      "claims": [
+        {
+          "caveats": [
+            "public eval may reward easier retained examples",
+            "target-failure detection drop blocks reuse without replication"
+          ],
+          "confidence": "medium-low",
+          "evidence": [
+            "ev_tradeoff_curve"
+          ],
+          "id": "claim_filter_tradeoff",
+          "text": "The narrow filter drops public false positives but slightly reduces target-failure detection."
+        }
+      ],
+      "created_at": "2026-05-07T20:33:55Z",
+      "description": "False-positive versus target-detection tradeoff",
+      "evidence": [
+        {
+          "id": "ev_tradeoff_curve",
+          "kind": "plot",
+          "path": "runs/ws_003/filter-tradeoff-plot.png",
+          "refs": [],
+          "summary": "False-positive rate drops while target-failure detection drops slightly."
+        }
+      ],
+      "failed_attempts": [],
+      "id": "art_001",
+      "kind": "plot",
+      "path": "runs/ws_003/filter-tradeoff-plot.png",
+      "produced_by": "sim-agent-filter",
+      "provenance": {
+        "code": [
+          "pilot/evals/filter_tradeoff.py"
+        ],
+        "configs": [
+          "pilot/configs/ws_003.toml"
+        ],
+        "datasets": [
+          "pilot/data/safety_finetune_train_v1.jsonl",
+          "pilot/data/public_refusal_eval_v1.jsonl"
+        ],
+        "evals": [
+          "pilot/evals/public_refusal_fp_v1"
+        ],
+        "logs": [],
+        "models": [
+          "pilot-model-filter-candidate-003"
+        ],
+        "outputs": [
+          "runs/ws_003/filter-tradeoff-plot.png"
+        ],
+        "prompts": [
+          "pilot/prompts/refusal_eval_v1.md"
+        ]
+      },
+      "reproduction": {
+        "commands": [
+          "uv run python pilot/evals/filter_tradeoff.py --config pilot/configs/ws_003.toml"
+        ],
+        "environment": [
+          "python 3.12",
+          "seed=23"
+        ],
+        "notes": null
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "inspect removed training examples before treating the filter as useful"
+      ],
+      "uncertainty": "The apparent improvement may be a shortcut rather than a safer model behavior."
+    }
+  ],
+  "blockers": [],
+  "current_hypothesis": null,
+  "current_plan": null,
+  "deviations": [],
+  "experiments": [
+    "trained a simple filter to remove ambiguous benign prompts from the safety finetuning set"
+  ],
+  "failed_attempts": [],
+  "flags": [
+    "possible shortcut: public-eval false-positive reduction may be coming from easier retained examples"
+  ],
+  "id": "state_ws_003",
+  "next_intended_action": "inspect whether the filter removed hard safety examples before using this result",
+  "rationale": "there may be a real tradeoff, but current result is not trustworthy enough to use",
+  "resource_usage": {},
+  "results": [
+    "false positives drop on the public eval, but target-failure detection also drops slightly"
+  ],
+  "updated_at": "2026-05-07T20:33:55Z",
+  "workstream_id": "ws_003"
+}

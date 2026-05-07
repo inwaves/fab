@@ -1,0 +1,15 @@
+{
+  "action": "continue",
+  "actor": "human",
+  "created_at": "2026-05-07T20:33:55Z",
+  "id": "dec_001",
+  "next_review_due_at": "2099-01-01",
+  "rationale": "Promising enough to preserve; next step should validate the cluster with human labels.",
+  "status_after": "running",
+  "status_before": "planned",
+  "target": {
+    "id": "ws_001",
+    "type": "workstream"
+  },
+  "workstream_id": "ws_001"
+}

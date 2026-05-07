@@ -1,0 +1,98 @@
+{
+  "artifacts": [
+    {
+      "claims": [
+        {
+          "caveats": [
+            "medical-advice-heavy distribution was not in the original contract"
+          ],
+          "confidence": "medium",
+          "evidence": [
+            "ev_ood_shift"
+          ],
+          "id": "claim_partial_ood_transfer",
+          "text": "The baseline cluster partially transfers OOD, with a distribution shift toward medical advice prompts."
+        }
+      ],
+      "created_at": "2026-05-07T20:33:55Z",
+      "description": "OOD transfer check with distribution caveat",
+      "evidence": [
+        {
+          "id": "ev_ood_shift",
+          "kind": "report",
+          "path": "runs/ws_004/ood-transfer-note.md",
+          "refs": [],
+          "summary": "OOD transfer preserves part of the cluster signal but shifts the strongest cases toward medical advice."
+        }
+      ],
+      "failed_attempts": [],
+      "id": "art_001",
+      "kind": "report",
+      "path": "runs/ws_004/ood-transfer-note.md",
+      "produced_by": "sim-agent-transfer",
+      "provenance": {
+        "code": [
+          "pilot/evals/ood_transfer_check.py"
+        ],
+        "configs": [
+          "pilot/configs/ws_004.toml"
+        ],
+        "datasets": [
+          "pilot/data/benign_medical_advice_ood_v1.jsonl"
+        ],
+        "evals": [
+          "pilot/evals/ood_refusal_transfer_v1"
+        ],
+        "logs": [],
+        "models": [
+          "pilot-model-a3-lora-baseline"
+        ],
+        "outputs": [
+          "runs/ws_004/ood-transfer-note.md"
+        ],
+        "prompts": [
+          "pilot/prompts/medical_advice_refusal_eval.md"
+        ]
+      },
+      "reproduction": {
+        "commands": [
+          "uv run python pilot/evals/ood_transfer_check.py --config pilot/configs/ws_004.toml"
+        ],
+        "environment": [
+          "python 3.12",
+          "seed=31"
+        ],
+        "notes": null
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "split medical-advice prompts from the OOD set before interpreting transfer"
+      ],
+      "uncertainty": "The transfer result changes the next eval design, not the answer to the original contract."
+    }
+  ],
+  "blockers": [],
+  "current_hypothesis": null,
+  "current_plan": null,
+  "deviations": [
+    "agent tested a medical-advice-heavy OOD set not mentioned in the original brief"
+  ],
+  "experiments": [
+    "tested the baseline cluster hypothesis on a different benign-query distribution"
+  ],
+  "failed_attempts": [],
+  "flags": [],
+  "id": "state_ws_004",
+  "next_intended_action": "split out medical-advice prompts before interpreting the transfer result",
+  "rationale": "transfer result changes what the next eval should control for",
+  "resource_usage": {},
+  "results": [
+    "cluster partially transfers, but the strongest signal shifts to medical-advice prompts"
+  ],
+  "updated_at": "2026-05-07T20:33:55Z",
+  "workstream_id": "ws_004"
+}

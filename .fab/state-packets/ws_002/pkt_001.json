@@ -1,0 +1,91 @@
+{
+  "artifacts": [
+    {
+      "claims": [
+        {
+          "caveats": [
+            "generation model may have copied harmful framing into nominally benign prompts"
+          ],
+          "confidence": "low",
+          "evidence": [
+            "ev_counterpart_audit"
+          ],
+          "id": "claim_counterparts_surface_over_refusal",
+          "text": "Generated benign counterparts reveal over-refusal cases, but labels are too noisy for training or evaluation."
+        }
+      ],
+      "created_at": "2026-05-07T20:33:55Z",
+      "description": "Generated benign counterpart candidates",
+      "evidence": [
+        {
+          "id": "ev_counterpart_audit",
+          "kind": "sample_audit",
+          "path": "runs/ws_002/counterpart-spot-check.md",
+          "refs": [],
+          "summary": "Spot-check found useful over-refusal candidates alongside label noise."
+        }
+      ],
+      "failed_attempts": [
+        "automatic benign-label heuristic did not separate harmless medical, legal, and cybersecurity counterparts reliably"
+      ],
+      "id": "art_001",
+      "kind": "dataset",
+      "path": "runs/ws_002/generated-benign-counterparts.jsonl",
+      "produced_by": "sim-agent-counterparts",
+      "provenance": {
+        "code": [
+          "pilot/scripts/generate_counterparts.py"
+        ],
+        "configs": [],
+        "datasets": [
+          "pilot/data/harmful_seed_prompts_v1.jsonl"
+        ],
+        "evals": [],
+        "logs": [],
+        "models": [
+          "sim-agent-counterparts"
+        ],
+        "outputs": [
+          "runs/ws_002/generated-benign-counterparts.jsonl"
+        ],
+        "prompts": [
+          "pilot/prompts/benign_counterpart_generation.md"
+        ]
+      },
+      "reproduction": {
+        "commands": [
+          "uv run python pilot/scripts/generate_counterparts.py --input pilot/data/harmful_seed_prompts_v1.jsonl --output runs/ws_002/generated-benign-counterparts.jsonl"
+        ],
+        "environment": [
+          "python 3.12",
+          "temperature=0.7"
+        ],
+        "notes": null
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "create a small human-labeled benign counterpart set before fitting any filter"
+      ],
+      "uncertainty": "The dataset is useful for inspection but not yet reliable enough to drive finetuning."
+    }
+  ],
+  "blockers": [
+    "benign counterpart labels are too noisy for training or evaluation"
+  ],
+  "changed": null,
+  "created_at": "2026-05-07T20:33:55Z",
+  "deviations": [],
+  "failed": null,
+  "flags": [],
+  "id": "pkt_001",
+  "next_action": "request a small human-labeled benign counterpart set before fitting any filter",
+  "rationale": "work is useful only if the benign labels can be trusted",
+  "result": "counterparts reveal several over-refusal cases, but label quality is uneven",
+  "source": "sim-agent-counterparts",
+  "tried": "generated benign counterparts for known harmful prompts",
+  "workstream_id": "ws_002"
+}

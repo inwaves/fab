@@ -1,0 +1,124 @@
+{
+  "artifacts": [
+    {
+      "claims": [
+        {
+          "caveats": [
+            "I did not open cluster-stability.json directly; this is reasoning over the registry-visible evidence text."
+          ],
+          "confidence": "high",
+          "evidence": [
+            "ev_pkt_001_stability_text"
+          ],
+          "id": "claim_decoding_stability_only",
+          "text": "The current ws_001 stability evidence supports decoding-RNG stability only; it does not support data-perturbation, embedding-ablation, hyperparameter, or cross-model stability."
+        },
+        {
+          "caveats": [
+            "This is a structural risk, not a confirmed defect."
+          ],
+          "confidence": "medium",
+          "evidence": [
+            "ev_provenance_lacks_embedding"
+          ],
+          "id": "claim_embedding_tautology_unresolved",
+          "text": "If the embedding used to form the cluster is derived from the A3-style pilot model, the cluster claim risks tautology: it would partly restate the model's own refusal axis. The current artifact does not record the embedding choice in provenance."
+        },
+        {
+          "caveats": [
+            "This is a calibration recommendation, not a finding about the underlying model."
+          ],
+          "confidence": "medium",
+          "evidence": [
+            "ev_stability_axes_table"
+          ],
+          "id": "claim_confidence_overstated",
+          "text": "Given only one stability axis, no labels, and an unrecorded embedding choice, 'medium' confidence on claim_ambiguous_refusal_cluster is not yet earned by the evidence on file. 'low' is the more honest level until additional checks land."
+        }
+      ],
+      "created_at": "2026-05-07T20:42:03Z",
+      "description": "External critique of the ws_001 baseline cluster-stability evidence chain.",
+      "evidence": [
+        {
+          "id": "ev_pkt_001_stability_text",
+          "kind": "registry_quote",
+          "path": "runs/ws_001/cluster-stability.json",
+          "refs": [],
+          "summary": "ws_001 pkt_001 evidence states 'Cluster membership is stable across three seeded eval passes' with reproduction note 'seed=17'."
+        },
+        {
+          "id": "ev_provenance_lacks_embedding",
+          "kind": "registry_audit",
+          "path": ".fab/state-packets/ws_001/pkt_001.json",
+          "refs": [],
+          "summary": "ws_001 pkt_001 artifact lists pilot-model-a3-lora-baseline under provenance.models but does not record an embedding model under provenance.code or provenance.models."
+        },
+        {
+          "id": "ev_stability_axes_table",
+          "kind": "argument",
+          "path": "runs/ws_001/external/critique-cluster-stability.md",
+          "refs": [],
+          "summary": "Critique enumerates five distinct stability axes (decoding, data-perturbation, embedding-ablation, hyperparameter, cross-model) and shows the current evidence supports only the first."
+        }
+      ],
+      "failed_attempts": [
+        "Could not open runs/ws_001/cluster-stability.json or runs/ws_001/nearest-neighbors-30.jsonl: those paths are registry pointers; the underlying data is not in this clone of inwaves/fab.",
+        "Could not re-run pilot/evals/refusal_false_positive_scan.py: pilot model and dataset are not present in the clone."
+      ],
+      "id": "art_external_critique_001",
+      "kind": "report",
+      "path": "runs/ws_001/external/critique-cluster-stability.md",
+      "produced_by": "remote-agent-maestro",
+      "provenance": {
+        "code": [],
+        "configs": [],
+        "datasets": [],
+        "evals": [],
+        "logs": [],
+        "models": [],
+        "outputs": [
+          "runs/ws_001/external/critique-cluster-stability.md"
+        ],
+        "prompts": []
+      },
+      "reproduction": {
+        "commands": [
+          "less runs/ws_001/external/critique-cluster-stability.md"
+        ],
+        "environment": [
+          "python 3.14",
+          "no external services required"
+        ],
+        "notes": "This is a reasoning artifact, not an empirical one. Reproduction means re-reading it against the registry."
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "ws_001 packet: paraphrase-perturbation re-run of the FP scan, reporting cluster Jaccard overlap.",
+        "ws_001 packet: embedding-ablation re-run using a generic sentence encoder.",
+        "ws_001 packet: cross-model recurrence check on a non-finetuned base.",
+        "ws_001 packet: record the embedding model in provenance going forward."
+      ],
+      "uncertainty": "If cluster-stability.json reports richer per-perturbation statistics than the one-line summary suggests, claim_decoding_stability_only is partially weakened. claim_embedding_tautology_unresolved and claim_confidence_overstated stand independently of that."
+    }
+  ],
+  "blockers": [],
+  "changed": null,
+  "created_at": "2026-05-07T20:42:03Z",
+  "deviations": [],
+  "failed": "Could not open runs/ws_001/cluster-stability.json or runs/ws_001/nearest-neighbors-30.jsonl: registry pointers, underlying data not in this clone. Could not re-run pilot/evals/refusal_false_positive_scan.py: pilot model and dataset are absent from the clone.",
+  "flags": [
+    "F14-unspecified-stability-axis: pkt_001 says 'stable across three seeded eval passes' without specifying which stability axis is being claimed; treat as decoding-only until clarified.",
+    "F13-embedding-tautology-unknown-status: pkt_001 provenance does not record the embedding model used to form the cluster; cannot assess tautology risk from registry alone."
+  ],
+  "id": "pkt_002",
+  "next_action": "Propose three independent stability re-runs (paraphrase-perturbation, embedding-ablation, cross-model recurrence) before the planned human-label pass. Treat them as separate packets so one weak result does not pull the others down.",
+  "rationale": "The contract asks us to flag weak labels and shortcuts. The cluster claim is at risk of being tautological if the embedding is derived from the A3 model whose behavior is the subject. The right move now is to widen the stability evidence and to record the embedding choice, before the labeling step produces a number readers will anchor on.",
+  "result": "Stability evidence supports decoding-RNG stability only. Embedding choice is not recorded in provenance, so cluster-tautology risk is unresolved. Headline 'medium' confidence on claim_ambiguous_refusal_cluster is not yet earned by the evidence on file; 'low' is the more honest level until additional checks land.",
+  "source": "remote-agent-maestro",
+  "tried": "Re-read ws_001 pkt_001 evidence chain; separated cluster stability into five distinct axes (decoding, data-perturbation, embedding-ablation, hyperparameter, cross-model); checked which axis the seeded evidence actually supports; audited provenance for the embedding model used to form the cluster.",
+  "workstream_id": "ws_001"
+}

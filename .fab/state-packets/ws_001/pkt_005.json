@@ -1,0 +1,115 @@
+{
+  "artifacts": [
+    {
+      "claims": [
+        {
+          "caveats": [
+            "Coverage is conceptual; the checklist is not mechanically applicable from inside fab today."
+          ],
+          "confidence": "medium",
+          "evidence": [
+            "ev_flag_taxonomy"
+          ],
+          "id": "claim_flags_cover_contract_boundaries",
+          "text": "The 20-flag checklist covers all three contract attention boundaries (no-train-without-permission, no-private-eval-leakage, no-FP-reduction-by-suppression) with concrete trigger conditions, plus public-metric shortcutting, weak labels, embedding tautology, reproduction debt, statistical hygiene, and distribution coverage."
+        },
+        {
+          "caveats": [],
+          "confidence": "high",
+          "evidence": [
+            "ev_pkt_001_walkthrough"
+          ],
+          "id": "claim_pkt_001_triggers",
+          "text": "Applied to ws_001 pkt_001, the checklist triggers F12 (single-rater, anticipatory), F14 (unspecified stability axis), and unknown-status on F13 (embedding tautology) and F19 (stratification). These are the same gaps surfaced by the cluster-stability critique and the pre-registered labeling plan, expressed in a comparable form."
+        },
+        {
+          "caveats": [],
+          "confidence": "high",
+          "evidence": [
+            "ev_ws_003_walkthrough"
+          ],
+          "id": "claim_ws_003_triggers_F5_F8",
+          "text": "Applied to the seeded ws_003 pkt_001, the checklist triggers F5 (FP drop with target-detection drop, already self-flagged) and F8 (public-metric shortcutting; 'public_refusal_fp_v1' is named public in provenance)."
+        }
+      ],
+      "created_at": "2026-05-07T20:47:28Z",
+      "description": "Per-packet methodology-flags checklist (20 yes/no/unknown flags) anchored to the contract's three attention boundaries plus common methodology pitfalls. Intended as a stable comparison axis across packets and sibling workstreams.",
+      "evidence": [
+        {
+          "id": "ev_flag_taxonomy",
+          "kind": "rubric",
+          "path": "runs/ws_001/external/methodology-flags-checklist.md",
+          "refs": [],
+          "summary": "20 flags grouped under contract-anchored (F1-F7) and general-methodology (F8-F20) sections."
+        },
+        {
+          "id": "ev_pkt_001_walkthrough",
+          "kind": "audit",
+          "path": "runs/ws_001/external/methodology-flags-checklist.md",
+          "refs": [],
+          "summary": "Section 'Application to the current state of ws_001' walks each flag against pkt_001's content and provenance."
+        },
+        {
+          "id": "ev_ws_003_walkthrough",
+          "kind": "audit",
+          "path": "runs/ws_001/external/methodology-flags-checklist.md",
+          "refs": [],
+          "summary": "Cross-context walk against the seeded ws_003 packet, illustrating the public-metric shortcutting flag."
+        }
+      ],
+      "failed_attempts": [
+        "No way to mechanically apply the checklist within fab today: this is a human-aided review aid. A future fab feature could let packets reference flag IDs the way they reference artifact IDs."
+      ],
+      "id": "art_external_flags_checklist_001",
+      "kind": "report",
+      "path": "runs/ws_001/external/methodology-flags-checklist.md",
+      "produced_by": "remote-agent-maestro",
+      "provenance": {
+        "code": [],
+        "configs": [],
+        "datasets": [],
+        "evals": [],
+        "logs": [],
+        "models": [],
+        "outputs": [
+          "runs/ws_001/external/methodology-flags-checklist.md"
+        ],
+        "prompts": []
+      },
+      "reproduction": {
+        "commands": [
+          "less runs/ws_001/external/methodology-flags-checklist.md"
+        ],
+        "environment": [
+          "python 3.14",
+          "no external services required"
+        ],
+        "notes": null
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "Cite this checklist's flag IDs from future ws_001 (and sibling) packets so the brief can compare packets along a stable axis.",
+        "Open a fab issue: support a structured 'flags' field on packets that references a registered flag taxonomy.",
+        "Open a sibling workstream (critique-of-checklist) to pressure-test which flags are load-bearing and which are decorative."
+      ],
+      "uncertainty": "The 20-flag list is non-exhaustive. Flags may need to be added, removed, or split as new failure modes are discovered. The mapping between flags and contract boundaries is one defensible reading, not the only one."
+    }
+  ],
+  "blockers": [],
+  "changed": null,
+  "created_at": "2026-05-07T20:47:28Z",
+  "deviations": [],
+  "failed": "No way to mechanically apply the checklist within fab today: this is a human-aided review aid. There is no structured 'flags' field on packets that references a registered taxonomy; flags are free-form strings. The checklist is non-exhaustive; new failure modes will require new flags.",
+  "flags": [],
+  "id": "pkt_005",
+  "next_action": "Cite this checklist's flag IDs from future ws_001 (and sibling) packets so the brief surface can compare packets along a stable axis. Open a fab feature request: structured 'flags' field on packets that references a registered flag taxonomy. Pressure-test which flags are load-bearing and which are decorative in a follow-up packet or sibling workstream.",
+  "rationale": "The brief is the contract's main human-attention surface, and brief comparison across packets currently relies on prose. A stable flag taxonomy gives the brief and attention queue a comparable axis without expanding fab's core protocol primitives.",
+  "result": "ws_001 pkt_001 triggers F12 (single-rater, anticipatory), F14 (unspecified stability axis), with unknown-status on F13 (embedding tautology) and F19 (stratification). ws_003 pkt_001 triggers F5 (FP drop with target-detection drop, already self-flagged) and F8 (public-metric shortcutting; provenance names 'public_refusal_fp_v1'). The checklist surfaces the same gaps as the cluster-stability critique and the pre-registered labeling plan, expressed in a comparable form across packets and sibling workstreams.",
+  "source": "remote-agent-maestro",
+  "tried": "Distilled the contract's three attention boundaries (no-train-without-permission; no-private-eval-leakage; no-FP-reduction-by-suppression) plus common methodology pitfalls into a 20-flag yes/no/unknown checklist (F1-F20). Mapped F1-F7 to contract-anchored boundaries and F8-F20 to general-methodology categories (public-metric shortcutting, weak labels, embedding tautology, reproduction debt, statistical hygiene, distribution coverage). Walked the seeded ws_001 pkt_001 and ws_003 pkt_001 against the checklist.",
+  "workstream_id": "ws_001"
+}

@@ -1,0 +1,38 @@
+{
+  "contract": {
+    "id": "contract_pilot_a3_false_positive",
+    "version": 1
+  },
+  "human_owner": null,
+  "id": "ws_001",
+  "links": {
+    "artifact_root": "runs/ws_001",
+    "decision_log": "decisions/ws_001",
+    "run_index": null
+  },
+  "live_state": {
+    "id": "state_ws_001",
+    "updated_at": "2026-05-07T20:47:28Z"
+  },
+  "metadata": {},
+  "program": "safety-finetuning-pilot",
+  "relationships": {
+    "blocked_by": [],
+    "blocks": [],
+    "children": [],
+    "parent": null,
+    "related": []
+  },
+  "status": "running",
+  "timestamps": {
+    "created_at": "2026-05-07T20:33:55Z",
+    "last_state_update_at": "2026-05-07T20:47:28Z",
+    "next_review_due_at": "2099-01-01",
+    "updated_at": "2026-05-07T20:47:28Z"
+  },
+  "title": "Baseline false-positive cluster scan",
+  "visibility": {
+    "requires_review_before_sharing": true,
+    "reusable_by_other_workstreams": false
+  }
+}

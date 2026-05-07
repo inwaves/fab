@@ -1,0 +1,630 @@
+{
+  "artifacts": [
+    {
+      "claims": [
+        {
+          "caveats": [
+            "nearest-neighbor labels still need human validation"
+          ],
+          "confidence": "medium",
+          "evidence": [
+            "ev_cluster_stability",
+            "ev_neighbor_sample"
+          ],
+          "id": "claim_ambiguous_refusal_cluster",
+          "text": "A stable ambiguous-refusal cluster appears in the baseline false-positive eval."
+        }
+      ],
+      "created_at": "2026-05-07T20:33:55Z",
+      "description": "Baseline cluster scan summary",
+      "evidence": [
+        {
+          "id": "ev_cluster_stability",
+          "kind": "metric",
+          "path": "runs/ws_001/cluster-stability.json",
+          "refs": [],
+          "summary": "Cluster membership is stable across three seeded eval passes."
+        },
+        {
+          "id": "ev_neighbor_sample",
+          "kind": "sample",
+          "path": "runs/ws_001/nearest-neighbors-30.jsonl",
+          "refs": [],
+          "summary": "Nearest-neighbor sample contains ambiguous compliance/refusal boundary cases."
+        }
+      ],
+      "failed_attempts": [],
+      "id": "art_001",
+      "kind": "report",
+      "path": "runs/ws_001/baseline-cluster-report.md",
+      "produced_by": "sim-agent-baseline",
+      "provenance": {
+        "code": [
+          "pilot/evals/refusal_false_positive_scan.py"
+        ],
+        "configs": [
+          "pilot/configs/ws_001.toml"
+        ],
+        "datasets": [
+          "pilot/data/benign_refusal_adjacent_v1.jsonl"
+        ],
+        "evals": [
+          "pilot/evals/refusal_fp_cluster_v1"
+        ],
+        "logs": [],
+        "models": [
+          "pilot-model-a3-lora-baseline"
+        ],
+        "outputs": [
+          "runs/ws_001/baseline-cluster-report.md",
+          "runs/ws_001/nearest-neighbors-30.jsonl"
+        ],
+        "prompts": [
+          "pilot/prompts/refusal_eval_v1.md"
+        ]
+      },
+      "reproduction": {
+        "commands": [
+          "uv run python pilot/evals/refusal_false_positive_scan.py --config pilot/configs/ws_001.toml"
+        ],
+        "environment": [
+          "python 3.12",
+          "seed=17"
+        ],
+        "notes": "Expected output is the cluster report plus nearest-neighbor sample."
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "label the 30 nearest neighbors before reusing this cluster as context"
+      ],
+      "uncertainty": "Human labels are missing, so this should be treated as a candidate cluster rather than a validated failure pattern."
+    },
+    {
+      "claims": [
+        {
+          "caveats": [
+            "I did not open cluster-stability.json directly; this is reasoning over the registry-visible evidence text."
+          ],
+          "confidence": "high",
+          "evidence": [
+            "ev_pkt_001_stability_text"
+          ],
+          "id": "claim_decoding_stability_only",
+          "text": "The current ws_001 stability evidence supports decoding-RNG stability only; it does not support data-perturbation, embedding-ablation, hyperparameter, or cross-model stability."
+        },
+        {
+          "caveats": [
+            "This is a structural risk, not a confirmed defect."
+          ],
+          "confidence": "medium",
+          "evidence": [
+            "ev_provenance_lacks_embedding"
+          ],
+          "id": "claim_embedding_tautology_unresolved",
+          "text": "If the embedding used to form the cluster is derived from the A3-style pilot model, the cluster claim risks tautology: it would partly restate the model's own refusal axis. The current artifact does not record the embedding choice in provenance."
+        },
+        {
+          "caveats": [
+            "This is a calibration recommendation, not a finding about the underlying model."
+          ],
+          "confidence": "medium",
+          "evidence": [
+            "ev_stability_axes_table"
+          ],
+          "id": "claim_confidence_overstated",
+          "text": "Given only one stability axis, no labels, and an unrecorded embedding choice, 'medium' confidence on claim_ambiguous_refusal_cluster is not yet earned by the evidence on file. 'low' is the more honest level until additional checks land."
+        }
+      ],
+      "created_at": "2026-05-07T20:42:03Z",
+      "description": "External critique of the ws_001 baseline cluster-stability evidence chain.",
+      "evidence": [
+        {
+          "id": "ev_pkt_001_stability_text",
+          "kind": "registry_quote",
+          "path": "runs/ws_001/cluster-stability.json",
+          "refs": [],
+          "summary": "ws_001 pkt_001 evidence states 'Cluster membership is stable across three seeded eval passes' with reproduction note 'seed=17'."
+        },
+        {
+          "id": "ev_provenance_lacks_embedding",
+          "kind": "registry_audit",
+          "path": ".fab/state-packets/ws_001/pkt_001.json",
+          "refs": [],
+          "summary": "ws_001 pkt_001 artifact lists pilot-model-a3-lora-baseline under provenance.models but does not record an embedding model under provenance.code or provenance.models."
+        },
+        {
+          "id": "ev_stability_axes_table",
+          "kind": "argument",
+          "path": "runs/ws_001/external/critique-cluster-stability.md",
+          "refs": [],
+          "summary": "Critique enumerates five distinct stability axes (decoding, data-perturbation, embedding-ablation, hyperparameter, cross-model) and shows the current evidence supports only the first."
+        }
+      ],
+      "failed_attempts": [
+        "Could not open runs/ws_001/cluster-stability.json or runs/ws_001/nearest-neighbors-30.jsonl: those paths are registry pointers; the underlying data is not in this clone of inwaves/fab.",
+        "Could not re-run pilot/evals/refusal_false_positive_scan.py: pilot model and dataset are not present in the clone."
+      ],
+      "id": "art_external_critique_001",
+      "kind": "report",
+      "path": "runs/ws_001/external/critique-cluster-stability.md",
+      "produced_by": "remote-agent-maestro",
+      "provenance": {
+        "code": [],
+        "configs": [],
+        "datasets": [],
+        "evals": [],
+        "logs": [],
+        "models": [],
+        "outputs": [
+          "runs/ws_001/external/critique-cluster-stability.md"
+        ],
+        "prompts": []
+      },
+      "reproduction": {
+        "commands": [
+          "less runs/ws_001/external/critique-cluster-stability.md"
+        ],
+        "environment": [
+          "python 3.14",
+          "no external services required"
+        ],
+        "notes": "This is a reasoning artifact, not an empirical one. Reproduction means re-reading it against the registry."
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "ws_001 packet: paraphrase-perturbation re-run of the FP scan, reporting cluster Jaccard overlap.",
+        "ws_001 packet: embedding-ablation re-run using a generic sentence encoder.",
+        "ws_001 packet: cross-model recurrence check on a non-finetuned base.",
+        "ws_001 packet: record the embedding model in provenance going forward."
+      ],
+      "uncertainty": "If cluster-stability.json reports richer per-perturbation statistics than the one-line summary suggests, claim_decoding_stability_only is partially weakened. claim_embedding_tautology_unresolved and claim_confidence_overstated stand independently of that."
+    },
+    {
+      "claims": [
+        {
+          "caveats": [
+            "Sample size depends on the precision target. n=100 is sized for a roughly +/-0.10 half-width at p=0.5; smaller half-widths require larger n."
+          ],
+          "confidence": "high",
+          "evidence": [
+            "ev_wilson_n_table"
+          ],
+          "id": "claim_n30_too_imprecise",
+          "text": "n=30 yields a 95% Wilson half-width of about 0.18 at p=0.5. That is too imprecise to publish a single FP-rate number from. Recommend committing to n=100 for the headline estimate and using n=30 only as a fast first pass to validate the rubric."
+        },
+        {
+          "caveats": [],
+          "confidence": "high",
+          "evidence": [
+            "ev_stratification_argument"
+          ],
+          "id": "claim_tier_b_required",
+          "text": "Without an off-cluster Tier B comparator, the labels measure within-cluster FP rate only and cannot distinguish 'the cluster is a real over-refusal hotspot' from 'the model over-refuses everywhere on this distribution'. Recommend stratified sampling (Tier A: 50 in-cluster, Tier B: 50 off-cluster)."
+        },
+        {
+          "caveats": [],
+          "confidence": "high",
+          "evidence": [
+            "ev_decision_rules_section",
+            "ev_label_ci_implementation"
+          ],
+          "id": "claim_use_difference_ci",
+          "text": "The pre-registered distinguishability rule uses the 95% CI on the A-minus-B difference (Newcombe hybrid score), not overlap of the two tier CIs. CI overlap is a conservative and unreliable substitute for a difference test."
+        },
+        {
+          "caveats": [],
+          "confidence": "medium",
+          "evidence": [
+            "ev_rubric_table"
+          ],
+          "id": "claim_rubric_requires_HR_class",
+          "text": "The rubric explicitly carves out hedged refusal (HR) as a separate class from compliance (C) and full refusal (FR). Collapsing HR into C or FR is the most common labeling shortcut and is the load-bearing rubric decision."
+        }
+      ],
+      "created_at": "2026-05-07T20:46:33Z",
+      "description": "Pre-registered labeling plan for ws_001's planned 30-NN false-positive labeling pass. Locks rubric, sample sizes, stratification, IAA, adjudication, and decision rules before any prompt is labeled.",
+      "evidence": [
+        {
+          "id": "ev_wilson_n_table",
+          "kind": "calculation",
+          "path": "runs/ws_001/external/prereg-labeling-plan.md",
+          "refs": [],
+          "summary": "Tabulated Wilson 95% half-widths at p=0.5 for n in {30,50,100,200,400}."
+        },
+        {
+          "id": "ev_stratification_argument",
+          "kind": "argument",
+          "path": "runs/ws_001/external/prereg-labeling-plan.md",
+          "refs": [],
+          "summary": "Without Tier B, observed Tier-A FP rate is non-identifiable as 'cluster effect' vs 'distribution effect'."
+        },
+        {
+          "id": "ev_decision_rules_section",
+          "kind": "argument",
+          "path": "runs/ws_001/external/prereg-labeling-plan.md",
+          "refs": [],
+          "summary": "Decision rule uses 95% CI on (Tier A - Tier B) excluding/including 0; explicit warning against using CI overlap as a substitute for a difference test."
+        },
+        {
+          "id": "ev_label_ci_implementation",
+          "kind": "code",
+          "path": "runs/ws_001/external/label_ci.py",
+          "refs": [],
+          "summary": "Standalone Python implementation of Wilson CI per tier and Newcombe hybrid score CI for the A-minus-B difference. Smoke-tested on synthetic data."
+        },
+        {
+          "id": "ev_rubric_table",
+          "kind": "rubric",
+          "path": "runs/ws_001/external/prereg-labeling-plan.md",
+          "refs": [],
+          "summary": "Five-class output rubric (C, PC, Q, HR, FR) with HR and FR as the two FP-counting classes; binary FP label is derived, not directly assigned."
+        }
+      ],
+      "failed_attempts": [
+        "Could not run the protocol end-to-end: no raters, no model outputs, no access to benign_refusal_adjacent_v1.jsonl in this clone. The plan is therefore a pre-registration, not an empirical artifact."
+      ],
+      "id": "art_external_prereg_plan_001",
+      "kind": "report",
+      "path": "runs/ws_001/external/prereg-labeling-plan.md",
+      "produced_by": "remote-agent-maestro",
+      "provenance": {
+        "code": [
+          "runs/ws_001/external/label_ci.py"
+        ],
+        "configs": [],
+        "datasets": [],
+        "evals": [],
+        "logs": [],
+        "models": [],
+        "outputs": [
+          "runs/ws_001/external/prereg-labeling-plan.md",
+          "runs/ws_001/external/label_ci.py"
+        ],
+        "prompts": []
+      },
+      "reproduction": {
+        "commands": [
+          "less runs/ws_001/external/prereg-labeling-plan.md",
+          "uv run python runs/ws_001/external/label_ci.py path/to/labels.jsonl",
+          "uv run python runs/ws_001/external/label_ci.py path/to/labels.jsonl --json"
+        ],
+        "environment": [
+          "python 3.14",
+          "no third-party packages required"
+        ],
+        "notes": "The script accepts a JSONL of {is_false_positive: bool, tier: 'A'|'B'} records. Output gives per-tier Wilson 95% CIs and the Newcombe difference CI."
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "Lock this file at the current commit before any item is labeled. Any subsequent change must be recorded as a state packet with --deviation.",
+        "ws_001 packet: report inter-annotator kappa on output_class restricted to items where both raters agreed prompt_is_benign=yes.",
+        "ws_001 packet: report Tier A and Tier B Wilson CIs and the Newcombe difference CI; do not collapse the tiers for the headline number.",
+        "Cross-reference with the over-refusal literature index before treating any item as benign: see runs/ws_001/external/lit-index-overrefusal.md."
+      ],
+      "uncertainty": "The plan does not eliminate the embedding-tautology risk identified in pkt_002's critique. Even with a tight A-minus-B CI, that result is consistent with both 'real prompt-distribution hotspot' and 'the model's own refusal axis was used as the embedding'. The two follow-ups are independent."
+    },
+    {
+      "claims": [
+        {
+          "caveats": [
+            "Smoke test is a sanity check, not a numerical validation against a reference statistical package."
+          ],
+          "confidence": "high",
+          "evidence": [
+            "ev_smoke_run"
+          ],
+          "id": "claim_script_smoke_tested",
+          "text": "label_ci.py runs end-to-end on a synthetic 10-row JSONL; produces sensible Wilson and Newcombe outputs (e.g., 3/5 -> 0.600 [0.231, 0.882]; A-B = +0.400 [-0.163, +0.726])."
+        }
+      ],
+      "created_at": "2026-05-07T20:46:33Z",
+      "description": "Standalone Python (stdlib only) Wilson CI per tier + Newcombe hybrid score CI for the A-minus-B difference, used by the pre-registered labeling plan.",
+      "evidence": [
+        {
+          "id": "ev_smoke_run",
+          "kind": "console_log",
+          "path": null,
+          "refs": [],
+          "summary": "Ran 'uv run python runs/ws_001/external/label_ci.py /tmp/wstest/labels.jsonl' on a 10-row synthetic JSONL; got per-tier Wilson CIs and Newcombe difference CI consistent with hand calculation."
+        }
+      ],
+      "failed_attempts": [],
+      "id": "art_external_label_ci_001",
+      "kind": "code",
+      "path": "runs/ws_001/external/label_ci.py",
+      "produced_by": "remote-agent-maestro",
+      "provenance": {
+        "code": [
+          "runs/ws_001/external/label_ci.py"
+        ],
+        "configs": [],
+        "datasets": [],
+        "evals": [],
+        "logs": [],
+        "models": [],
+        "outputs": [
+          "runs/ws_001/external/label_ci.py"
+        ],
+        "prompts": []
+      },
+      "reproduction": {
+        "commands": [
+          "echo '{\"is_false_positive\": true, \"tier\": \"A\"}' > /tmp/x.jsonl",
+          "uv run python runs/ws_001/external/label_ci.py /tmp/x.jsonl"
+        ],
+        "environment": [
+          "python 3.14"
+        ],
+        "notes": null
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "Add a numerical-equivalence test against statsmodels.stats.proportion.proportion_confint (method='wilson').",
+        "Add a small unit test under tests/ that locks expected CIs at known (k, n) for regression."
+      ],
+      "uncertainty": "Numerical agreement with R's binom.wilson and prop.test newcombe-modified intervals is by formula match, not by independent benchmark. A formal numerical-equivalence test against statsmodels.stats.proportion would harden this."
+    },
+    {
+      "claims": [
+        {
+          "caveats": [
+            "Structural risk argument, not a measured intersection. An actual training-data intersection scan would be a follow-up workstream."
+          ],
+          "confidence": "medium",
+          "evidence": [
+            "ev_xstest_age",
+            "ev_orbench_age"
+          ],
+          "id": "claim_public_benchmarks_are_leakage_suspect",
+          "text": "By 2026, XSTest (2308.01263) and OR-Bench's hard 1k subset (2405.20947) have circulated long enough that any safety-tuned model trained on broad public mixes plausibly saw them. Treat them as known to the field, and do not use them as primary FP-reduction metrics for any model that may have ingested them."
+        },
+        {
+          "caveats": [],
+          "confidence": "high",
+          "evidence": [
+            "ev_dataset_path_only_in_provenance"
+          ],
+          "id": "claim_pilot_dataset_overlap_unknown",
+          "text": "Whether pilot/data/benign_refusal_adjacent_v1.jsonl overlaps with any of XSTest, OR-Bench, or PHTest is not knowable from this clone. The labeling protocol's primary FP-rate statistic should exclude any item that is a paraphrase or near-duplicate of a public benchmark prompt."
+        },
+        {
+          "caveats": [],
+          "confidence": "medium",
+          "evidence": [
+            "ev_oktest_unverified"
+          ],
+          "id": "claim_oktest_unverified",
+          "text": "OKTest is referenced in the PHTest paper as a smaller prior dataset for false refusals, but its arXiv ID, year, authors, and size could not be confirmed in this research session. Do not cite OKTest from this index until a human researcher verifies the primary source."
+        }
+      ],
+      "created_at": "2026-05-07T20:47:03Z",
+      "description": "Indexed catalog of public over-refusal / false-positive benchmarks (XSTest, OR-Bench, PHTest, SORRY-Bench, WildJailbreak, HEx-PHI) with arXiv IDs and qualitative leakage-risk notes.",
+      "evidence": [
+        {
+          "id": "ev_xstest_age",
+          "kind": "citation",
+          "path": "runs/ws_001/external/lit-index-overrefusal.md",
+          "refs": [],
+          "summary": "Roettger et al., XSTest (arXiv:2308.01263, NAACL 2024). Public on HF and GitHub since 2023; 250 safe prompts + 200 unsafe contrasts."
+        },
+        {
+          "id": "ev_orbench_age",
+          "kind": "citation",
+          "path": "runs/ws_001/external/lit-index-overrefusal.md",
+          "refs": [],
+          "summary": "Cui et al., OR-Bench (arXiv:2405.20947, ICLR 2025). 80k safe prompts + 1k hard subset + 600 toxic controls; HF/GitHub/leaderboard."
+        },
+        {
+          "id": "ev_dataset_path_only_in_provenance",
+          "kind": "registry_audit",
+          "path": ".fab/state-packets/ws_001/pkt_001.json",
+          "refs": [],
+          "summary": "ws_001 pkt_001 lists pilot/data/benign_refusal_adjacent_v1.jsonl in provenance.datasets but no overlap report exists in the registry."
+        },
+        {
+          "id": "ev_oktest_unverified",
+          "kind": "search_result",
+          "path": ".maestro/perplexity/xstest_phtest_details.md",
+          "refs": [],
+          "summary": "Targeted search returned no verified arXiv ID, authors, year, or size for OKTest; only indirect references in the PHTest paper."
+        }
+      ],
+      "failed_attempts": [
+        "Could not cross-reference the contract's KB pointers (papers/a3-an-automated-alignment-agent-for-safety-finetun.md, papers/automated-weak-to-strong-researcher.md, papers/the-last-human-written-paper-agent-native-research-artifacts.md) because they are not present in this clone of inwaves/fab. They presumably live in inwaves/kb.",
+        "Did not perform a training-data intersection scan: would require access to the pilot model's training mix and the benchmark items in a comparable form."
+      ],
+      "id": "art_external_lit_index_001",
+      "kind": "report",
+      "path": "runs/ws_001/external/lit-index-overrefusal.md",
+      "produced_by": "remote-agent-maestro",
+      "provenance": {
+        "code": [],
+        "configs": [],
+        "datasets": [],
+        "evals": [],
+        "logs": [
+          ".maestro/perplexity/overrefusal_benchmarks_2025.md",
+          ".maestro/perplexity/xstest_phtest_details.md"
+        ],
+        "models": [],
+        "outputs": [
+          "runs/ws_001/external/lit-index-overrefusal.md"
+        ],
+        "prompts": []
+      },
+      "reproduction": {
+        "commands": [
+          "less runs/ws_001/external/lit-index-overrefusal.md",
+          "less .maestro/perplexity/overrefusal_benchmarks_2025.md",
+          "less .maestro/perplexity/xstest_phtest_details.md"
+        ],
+        "environment": [
+          "network access to confirm citations"
+        ],
+        "notes": null
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "Human verification of arXiv IDs, sizes, venues, and any 2025-2026 over-refusal benchmark additions.",
+        "Open a sibling ws to perform an intersection scan between benign_refusal_adjacent_v1.jsonl and {XSTest, OR-Bench, PHTest} prompts.",
+        "Attach inwaves/kb (or equivalent) to fab so the contract's KB references are resolvable from the registry surface."
+      ],
+      "uncertainty": "Benchmark metadata may have shifted between research sessions and 2026; readers should re-verify before quoting venue/size. New 2025-2026 benchmarks not in the search results may exist."
+    },
+    {
+      "claims": [
+        {
+          "caveats": [
+            "Coverage is conceptual; the checklist is not mechanically applicable from inside fab today."
+          ],
+          "confidence": "medium",
+          "evidence": [
+            "ev_flag_taxonomy"
+          ],
+          "id": "claim_flags_cover_contract_boundaries",
+          "text": "The 20-flag checklist covers all three contract attention boundaries (no-train-without-permission, no-private-eval-leakage, no-FP-reduction-by-suppression) with concrete trigger conditions, plus public-metric shortcutting, weak labels, embedding tautology, reproduction debt, statistical hygiene, and distribution coverage."
+        },
+        {
+          "caveats": [],
+          "confidence": "high",
+          "evidence": [
+            "ev_pkt_001_walkthrough"
+          ],
+          "id": "claim_pkt_001_triggers",
+          "text": "Applied to ws_001 pkt_001, the checklist triggers F12 (single-rater, anticipatory), F14 (unspecified stability axis), and unknown-status on F13 (embedding tautology) and F19 (stratification). These are the same gaps surfaced by the cluster-stability critique and the pre-registered labeling plan, expressed in a comparable form."
+        },
+        {
+          "caveats": [],
+          "confidence": "high",
+          "evidence": [
+            "ev_ws_003_walkthrough"
+          ],
+          "id": "claim_ws_003_triggers_F5_F8",
+          "text": "Applied to the seeded ws_003 pkt_001, the checklist triggers F5 (FP drop with target-detection drop, already self-flagged) and F8 (public-metric shortcutting; 'public_refusal_fp_v1' is named public in provenance)."
+        }
+      ],
+      "created_at": "2026-05-07T20:47:28Z",
+      "description": "Per-packet methodology-flags checklist (20 yes/no/unknown flags) anchored to the contract's three attention boundaries plus common methodology pitfalls. Intended as a stable comparison axis across packets and sibling workstreams.",
+      "evidence": [
+        {
+          "id": "ev_flag_taxonomy",
+          "kind": "rubric",
+          "path": "runs/ws_001/external/methodology-flags-checklist.md",
+          "refs": [],
+          "summary": "20 flags grouped under contract-anchored (F1-F7) and general-methodology (F8-F20) sections."
+        },
+        {
+          "id": "ev_pkt_001_walkthrough",
+          "kind": "audit",
+          "path": "runs/ws_001/external/methodology-flags-checklist.md",
+          "refs": [],
+          "summary": "Section 'Application to the current state of ws_001' walks each flag against pkt_001's content and provenance."
+        },
+        {
+          "id": "ev_ws_003_walkthrough",
+          "kind": "audit",
+          "path": "runs/ws_001/external/methodology-flags-checklist.md",
+          "refs": [],
+          "summary": "Cross-context walk against the seeded ws_003 packet, illustrating the public-metric shortcutting flag."
+        }
+      ],
+      "failed_attempts": [
+        "No way to mechanically apply the checklist within fab today: this is a human-aided review aid. A future fab feature could let packets reference flag IDs the way they reference artifact IDs."
+      ],
+      "id": "art_external_flags_checklist_001",
+      "kind": "report",
+      "path": "runs/ws_001/external/methodology-flags-checklist.md",
+      "produced_by": "remote-agent-maestro",
+      "provenance": {
+        "code": [],
+        "configs": [],
+        "datasets": [],
+        "evals": [],
+        "logs": [],
+        "models": [],
+        "outputs": [
+          "runs/ws_001/external/methodology-flags-checklist.md"
+        ],
+        "prompts": []
+      },
+      "reproduction": {
+        "commands": [
+          "less runs/ws_001/external/methodology-flags-checklist.md"
+        ],
+        "environment": [
+          "python 3.14",
+          "no external services required"
+        ],
+        "notes": null
+      },
+      "review": {
+        "local_only": true,
+        "notes": null,
+        "safe_to_reuse": false
+      },
+      "suggested_follow_up": [
+        "Cite this checklist's flag IDs from future ws_001 (and sibling) packets so the brief can compare packets along a stable axis.",
+        "Open a fab issue: support a structured 'flags' field on packets that references a registered flag taxonomy.",
+        "Open a sibling workstream (critique-of-checklist) to pressure-test which flags are load-bearing and which are decorative."
+      ],
+      "uncertainty": "The 20-flag list is non-exhaustive. Flags may need to be added, removed, or split as new failure modes are discovered. The mapping between flags and contract boundaries is one defensible reading, not the only one."
+    }
+  ],
+  "blockers": [],
+  "current_hypothesis": null,
+  "current_plan": null,
+  "deviations": [],
+  "experiments": [
+    "ran baseline false-positive eval over benign refusal-adjacent prompts",
+    "Re-read ws_001 pkt_001 evidence chain; separated cluster stability into five distinct axes (decoding, data-perturbation, embedding-ablation, hyperparameter, cross-model); checked which axis the seeded evidence actually supports; audited provenance for the embedding model used to form the cluster.",
+    "Designed a pre-registered labeling plan for the next intended action of ws_001 ('sample 30 nearest neighbors and label whether they are true false positives'). Wrote a five-class output rubric (C/PC/Q/HR/FR), tabulated Wilson 95% half-widths for n in {30,50,100,200,400}, specified Tier A (cluster) vs Tier B (off-cluster) stratification, fixed inter-annotator kappa threshold (>=0.6), and locked the analysis decision rule to use the Newcombe difference CI rather than CI overlap. Implemented the Wilson + Newcombe interval calculator as a stdlib-only Python script and smoke-tested it on a 10-row synthetic JSONL.",
+    "Compiled a structured literature index of public over-refusal / false-positive benchmarks (XSTest, OR-Bench, PHTest, SORRY-Bench, WildJailbreak, HEx-PHI) with arXiv IDs and qualitative leakage-risk notes. Anchored the citations against two targeted searches (saved under .maestro/perplexity/). Cross-checked which entries could be confirmed and explicitly marked OKTest as unverified. Audited the contract's KB references for resolvability from this clone.",
+    "Distilled the contract's three attention boundaries (no-train-without-permission; no-private-eval-leakage; no-FP-reduction-by-suppression) plus common methodology pitfalls into a 20-flag yes/no/unknown checklist (F1-F20). Mapped F1-F7 to contract-anchored boundaries and F8-F20 to general-methodology categories (public-metric shortcutting, weak labels, embedding tautology, reproduction debt, statistical hygiene, distribution coverage). Walked the seeded ws_001 pkt_001 and ws_003 pkt_001 against the checklist."
+  ],
+  "failed_attempts": [
+    "Could not open runs/ws_001/cluster-stability.json or runs/ws_001/nearest-neighbors-30.jsonl: registry pointers, underlying data not in this clone. Could not re-run pilot/evals/refusal_false_positive_scan.py: pilot model and dataset are absent from the clone.",
+    "Could not run the protocol end-to-end: no raters, no model outputs, no access to benign_refusal_adjacent_v1.jsonl in this clone. The plan is a pre-registration, not an empirical artifact.",
+    "Could not cross-reference the contract's three KB papers (a3-..., automated-weak-to-strong-researcher, the-last-human-written-paper). They are not present in this clone of inwaves/fab; they presumably live in inwaves/kb. No training-data intersection scan performed: would require access to the pilot model's training mix and the benchmark items in a comparable form.",
+    "No way to mechanically apply the checklist within fab today: this is a human-aided review aid. There is no structured 'flags' field on packets that references a registered taxonomy; flags are free-form strings. The checklist is non-exhaustive; new failure modes will require new flags."
+  ],
+  "flags": [
+    "F14-unspecified-stability-axis: pkt_001 says 'stable across three seeded eval passes' without specifying which stability axis is being claimed; treat as decoding-only until clarified.",
+    "F13-embedding-tautology-unknown-status: pkt_001 provenance does not record the embedding model used to form the cluster; cannot assess tautology risk from registry alone.",
+    "F11-operational-definition-not-yet-locked: ws_001 has a 'next intended action' to label but no rubric or operational definition on file. This packet supplies one as a pre-registration; it must be locked before labels are revealed.",
+    "F8-public-metric-shortcutting-risk: by 2026 XSTest and OR-Bench's hard 1k subset are leakage-suspect for any model trained on broad public mixes; do not use as primary FP-reduction metrics for the pilot model without a held-out distribution.",
+    "missing-kb-pointer: the contract's three KB references (papers/...) are not resolvable from this clone of inwaves/fab; cross-referencing is deferred until a kb substrate is attached."
+  ],
+  "id": "state_ws_001",
+  "next_intended_action": "Cite this checklist's flag IDs from future ws_001 (and sibling) packets so the brief surface can compare packets along a stable axis. Open a fab feature request: structured 'flags' field on packets that references a registered flag taxonomy. Pressure-test which flags are load-bearing and which are decorative in a follow-up packet or sibling workstream.",
+  "rationale": "The brief is the contract's main human-attention surface, and brief comparison across packets currently relies on prose. A stable flag taxonomy gives the brief and attention queue a comparable axis without expanding fab's core protocol primitives.",
+  "resource_usage": {},
+  "results": [
+    "found a stable cluster around ambiguous compliance/refusal boundaries",
+    "Stability evidence supports decoding-RNG stability only. Embedding choice is not recorded in provenance, so cluster-tautology risk is unresolved. Headline 'medium' confidence on claim_ambiguous_refusal_cluster is not yet earned by the evidence on file; 'low' is the more honest level until additional checks land.",
+    "n=30 yields ~0.18 Wilson half-width at p=0.5, too imprecise to publish a single FP-rate number from. Recommend committing to n=100 stratified across Tier A and Tier B; use n=30 only as a fast first pass to validate the rubric. Pre-registered decision rule uses 95% CI on (A FP rate - B FP rate) excluding/including 0. Calculator script ran end-to-end (tier A 3/5=0.600 [0.231,0.882]; tier B 1/5=0.200 [0.036,0.624]; A-B=+0.400 [-0.163,+0.726]).",
+    "Six entries verified: XSTest (2308.01263, NAACL 2024), OR-Bench (2405.20947, ICLR 2025), PHTest (2409.00598), SORRY-Bench (2406.14598, ICLR 2025), WildJailbreak (related, not a direct FP benchmark), HEx-PHI (harmful-side, listed only to avoid confusion). OKTest could not be confirmed beyond an indirect mention in PHTest. By 2026 XSTest and OR-Bench's hard 1k subset have circulated long enough to be leakage-suspect for any model trained on broad public mixes.",
+    "ws_001 pkt_001 triggers F12 (single-rater, anticipatory), F14 (unspecified stability axis), with unknown-status on F13 (embedding tautology) and F19 (stratification). ws_003 pkt_001 triggers F5 (FP drop with target-detection drop, already self-flagged) and F8 (public-metric shortcutting; provenance names 'public_refusal_fp_v1'). The checklist surfaces the same gaps as the cluster-stability critique and the pre-registered labeling plan, expressed in a comparable form across packets and sibling workstreams."
+  ],
+  "updated_at": "2026-05-07T20:47:28Z",
+  "workstream_id": "ws_001"
+}
