@@ -378,6 +378,182 @@ class RegistryStoreTest(unittest.TestCase):
                 {"type": "claim", "id": "art_001/claim_cluster"},
             )
 
+    def test_brief_contract_review_rolls_up_claims_limitations_and_refs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = RegistryStore.at(Path(tmp))
+            store.write_contract_version("contract_001", 1, "# Contract\n")
+            store.write_contract_version("contract_002", 1, "# Other Contract\n")
+            store.create_workstream(
+                title="Cluster audit A",
+                program="safety-finetuning",
+                contract_id="contract_001",
+                contract_version=1,
+            )
+            store.create_workstream(
+                title="Cluster audit B",
+                program="safety-finetuning",
+                contract_id="contract_001",
+                contract_version=1,
+            )
+            store.create_workstream(
+                title="Other contract work",
+                program="safety-finetuning",
+                contract_id="contract_002",
+                contract_version=1,
+            )
+            for workstream_id, source, claim_text in [
+                ("ws_001", "agent-a", "Cluster stability is only seeded stability."),
+                ("ws_002", "agent-b", "  cluster stability is only seeded stability.  "),
+                ("ws_003", "agent-c", "This claim is out of scope for contract 001."),
+            ]:
+                store.add_state_packet(
+                    workstream_id,
+                    source=source,
+                    result="audited cluster stability",
+                    rationale="the contract asks whether the cluster claim is reliable",
+                    artifact_ref=[
+                        {
+                            "path": f"runs/{workstream_id}/report.md",
+                            "status": "completed_with_limitations",
+                            "claims": [
+                                {
+                                    "id": "claim_stability",
+                                    "text": claim_text,
+                                }
+                            ],
+                            "evidence": ["report describes the stability axis"],
+                            "limitations": ["Original model artifacts were unavailable."],
+                            "used_refs": [
+                                "alexandria://papers/a3-an-automated-alignment-agent-for-safety-finetun.md"
+                            ],
+                        }
+                    ],
+                )
+            store.add_decision(
+                "ws_001",
+                action="needs-replication",
+                target_type="claim",
+                target_id="art_001/claim_stability",
+                rationale="same claim should be rerun with the original model",
+            )
+
+            brief = store.brief(contract_id="contract_001")
+            review = brief["contract_review"]
+
+            self.assertEqual(brief["counts"]["workstreams"], 2)
+            self.assertEqual(review["mode"], "deterministic")
+            self.assertEqual(review["scope"], {"workstreams": 2, "artifacts": 2, "claims": 2})
+            self.assertEqual(len(review["repeated_claims"]), 1)
+            self.assertEqual(review["repeated_claims"][0]["count"], 2)
+            self.assertEqual(
+                review["repeated_claims"][0]["workstreams"],
+                ["ws_001", "ws_002"],
+            )
+            self.assertEqual(len(review["shared_limitations"]), 1)
+            self.assertEqual(review["shared_limitations"][0]["count"], 2)
+            self.assertEqual(len(review["shared_used_refs"]), 1)
+            self.assertEqual(review["shared_used_refs"][0]["count"], 2)
+            self.assertEqual(
+                review["review_queue"]["needs_replication"][0]["target"],
+                {"type": "claim", "id": "art_001/claim_stability"},
+            )
+            self.assertEqual(
+                [claim["workstream_id"] for claim in review["review_queue"]["unreviewed_claims"]],
+                ["ws_002"],
+            )
+            self.assertIn("No deterministic contradiction inference yet", review["summary"][-1])
+
+    def test_reference_check_resolves_explicit_alexandria_refs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            alexandria = root / "alexandria"
+            note = alexandria / "papers" / "a3.md"
+            note.parent.mkdir(parents=True)
+            note.write_text(
+                '---\ntitle: "A3 Note"\n---\n\n# Ignored H1\n\nBody.\n',
+                encoding="utf-8",
+            )
+            store = RegistryStore.at(root / ".fab")
+            store.add_source("alexandria", alexandria, uri_prefix="alexandria://")
+            store.write_contract_version(
+                "contract_001",
+                1,
+                "Use `alexandria://papers/a3.md` and `alexandria://papers/missing.md`.\n"
+                "Also see https://example.com/context.\n",
+            )
+
+            result = store.check_references(contract_id="contract_001", version=1)
+
+            by_uri = {entry["uri"]: entry["resolution"] for entry in result["explicit_refs"]}
+            self.assertEqual(by_uri["alexandria://papers/a3.md"]["status"], "resolved")
+            self.assertEqual(by_uri["alexandria://papers/a3.md"]["title"], "A3 Note")
+            self.assertTrue(by_uri["alexandria://papers/a3.md"]["content_hash"].startswith("sha256:"))
+            self.assertEqual(by_uri["alexandria://papers/missing.md"]["status"], "unresolved")
+            self.assertEqual(by_uri["https://example.com/context"]["status"], "external")
+            self.assertEqual(
+                result["comparison"]["unresolved_explicit"][0]["uri"],
+                "alexandria://papers/missing.md",
+            )
+
+    def test_brief_reference_review_compares_contract_and_used_refs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            alexandria = root / "alexandria"
+            for relpath, title in [
+                ("papers/a3.md", "A3 Note"),
+                ("papers/extra.md", "Extra Note"),
+            ]:
+                path = alexandria / relpath
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"---\ntitle: \"{title}\"\n---\n\nBody.\n", encoding="utf-8")
+
+            store = RegistryStore.at(root / ".fab")
+            store.add_source("alexandria", alexandria, uri_prefix="alexandria://")
+            store.write_contract_version(
+                "contract_001",
+                1,
+                "Background: alexandria://papers/a3.md and alexandria://papers/not-used.md\n",
+            )
+            store.create_workstream(
+                title="A3 false-positive reduction",
+                program="safety-finetuning",
+                contract_id="contract_001",
+                contract_version=1,
+            )
+            store.add_state_packet(
+                "ws_001",
+                source="agent-a",
+                rationale="checked explicit references",
+                artifact_ref=[
+                    {
+                        "path": "runs/ws_001/report.md",
+                        "claims": ["Reference comparison works."],
+                        "used_refs": [
+                            "alexandria://papers/a3.md",
+                            "alexandria://papers/extra.md",
+                        ],
+                    }
+                ],
+            )
+
+            brief = store.brief(contract_id="contract_001")
+            references = brief["references"]
+
+            self.assertEqual(brief["counts"]["explicit_refs"], 2)
+            self.assertEqual(brief["counts"]["used_refs"], 2)
+            self.assertEqual(
+                references["comparison"]["used_not_explicit"],
+                ["alexandria://papers/extra.md"],
+            )
+            self.assertEqual(
+                references["comparison"]["explicit_not_used"],
+                ["alexandria://papers/not-used.md"],
+            )
+            self.assertEqual(
+                references["comparison"]["unresolved_explicit"][0]["uri"],
+                "alexandria://papers/not-used.md",
+            )
+
     def test_decision_can_change_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = RegistryStore.at(Path(tmp))

@@ -128,27 +128,38 @@ That is more useful than pretending Fab knows the intended role of every source.
 
 ## Commands
 
-Initial commands should stay small:
+The MVP commands stay small:
 
 ```bash
 uv run fab sources add alexandria ../alexandria --uri-prefix alexandria://
-uv run fab refs check --scope contract:contract_pilot_a3_false_positive/v1
-uv run fab context show ws_001
+uv run fab sources list
+uv run fab refs check --contract-id contract_pilot_a3_false_positive --version 1
+uv run fab refs check --workstream-id ws_001
 ```
 
-`refs check` should not infer a full bibliography. It should:
+`sources add` writes `.fab/sources.json`. For the MVP, Alexandria is just a
+URI prefix mapped to a local checkout path.
 
-- scan the contract and live references for explicit `alexandria://`, `fab://`,
-  `s3://`, local Markdown, and HTTP references;
-- resolve the ones it can;
-- record title, content hash, and revision if available;
+`refs check` does not infer a full bibliography. It:
+
+- scans contract text for explicit URI references;
+- resolves configured local-source refs such as `alexandria://...`;
+- treats HTTP refs as external;
+- records title, content hash, source path, git commit, and dirty status when
+  available;
 - warn about unresolved explicit references;
-- warn if a configured source is dirty or unpinned;
-- warn if a referenced Fab claim is marked `needs-replication`,
-  `do-not-propagate`, or similar.
+- compares explicit contract refs with agent-reported `used_refs` for
+  workstream checks and briefs.
 
-`context show` should show the contract plus resolved explicit references. It
-can also show agent-used references after ingest.
+`fab brief --contract-id ...` includes a `references` section that shows:
+
+- explicit refs in the contract scope;
+- refs agents actually used;
+- unresolved refs;
+- used refs not explicit in the contract;
+- explicit contract refs not used by agents.
+
+There is no context builder yet. The contract remains the context package.
 
 ## Alexandria Layout
 

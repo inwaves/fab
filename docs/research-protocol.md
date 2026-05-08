@@ -102,6 +102,16 @@ surface:
 The brief is an attention-allocation surface. It is not the endpoint of the
 research.
 
+For now, contract-scoped comparison is deterministic. `fab brief` exposes a
+`contract_review` object that groups repeated claim text, shared limitations,
+shared references, unreviewed artifacts/claims, and human judgment queues. It
+does not infer deep semantic agreement or contradiction.
+
+The more intelligent comparison pass is deferred. It should likely be a
+reviewer agent that reads the contract-scoped corpus and emits a synthesis
+artifact. That synthesis should make the human's reading problem smaller while
+remaining inspectable and judgeable inside Fab.
+
 ## Brief To Human Judgment
 
 The human judgment step decides what the researcher makes of the batch:
@@ -129,6 +139,9 @@ notes can coexist there. The
 contract remains natural-language first. Fab resolves explicit references when
 they are present, records resolution snapshots, records what references an agent
 actually used, and leaves write-back under human judgment.
+
+For the MVP this is implemented through `fab sources add`, `fab refs check`, and
+the `references` section in `fab brief`.
 
 Agents should build on prior findings without becoming librarians. They should
 use prior context and produce artefact packages. Humans decide what enters

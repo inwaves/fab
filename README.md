@@ -47,17 +47,21 @@ The implemented pieces are still modest:
 - **Live state**: the latest known hypothesis, result, blocker, intended next
   step, and rationale.
 - **Remote ingest boundary**: `ingest-run` accepts completed local bundles from
-  execution systems without requiring agents to clone Fab; a separate
-  Alexandria ingester service is the next step.
+  execution systems without requiring agents to clone Fab.
+- **Alexandria ingester service**: a thin service under `services/` scans
+  Alexandria for completed bundles, calls Fab's ingest boundary, and records an
+  append-only ingest ledger.
 - **Artefact packages**: one bundle per run containing the report, code,
   results, logs, claims, evidence, limitations, and suggested follow-up.
 - **Brief**: a compact human-facing view over workstreams, attention reasons,
-  artifacts, claims, judgments, and context that is safe or unsafe to carry
-  forward.
+  artifacts, claims, deterministic contract review, judgments, and context that
+  is safe or unsafe to carry forward.
 - **Human judgments**: append-only rationale records that can target a
   workstream, artifact, or claim.
 - **Attention queue**: a mechanical list of workstreams that look blocked,
   stale, limited, unscoped, or due for human attention.
+- **Knowledge substrate interface**: explicit `alexandria://` references can be
+  resolved, checked, and compared with agent-reported `used_refs`.
 - **Pilot fixture**: a simulated batch of black-box agent outputs for testing
   the human inspection workflow.
 
@@ -143,6 +147,9 @@ uv run fab attach-contract ws_001 --contract-id contract_001 --version 1
 uv run fab packet ws_001 --source agent-a --changed "..." --next "..." --rationale "..."
 uv run fab packet ws_001 --source agent-a --artifact runs/ws_001/baseline-report.md
 uv run fab ingest-run --from ../alexandria/artifacts/program/ws_001/run-abc123
+uv run python -m services.alexandria_ingester --alexandria ../alexandria --store .fab
+uv run fab sources add alexandria ../alexandria --uri-prefix alexandria://
+uv run fab refs check --contract-id contract_pilot_a3_false_positive --version 1
 uv run fab judge ws_001 --action replicate --rationale "..."
 uv run fab judge ws_001 --target-type claim --target-id art_001/claim_001 --action needs-replication --rationale "..."
 uv run fab judge ws_001 --action escalate --rationale "..." --next-attention-due-at 2026-05-10
@@ -159,6 +166,7 @@ uv run fab link ws_001 ws_002 --relationship related
 - [Research contracts](docs/contracts.md)
 - [Research protocol](docs/research-protocol.md)
 - [Remote execution and ingest](docs/remote-ingest.md)
+- [Alexandria ingester service](docs/alexandria-ingester.md)
 - [Knowledge substrate interface](docs/knowledge-substrate.md)
 - [Brief and human judgment](docs/brief-and-judgment.md)
 - [Artefact packages](docs/artifacts.md)
@@ -178,9 +186,9 @@ durable smoke fixture at
 Set `FAB_ALEXANDRIA_REPO=/path/to/alexandria` to point the integration test at
 another checkout.
 
-## Next Build
+## MVP Status
 
-The next build target is a small Alexandria ingester service that discovers
-committed run bundles and calls the existing `ingest-run` boundary, then
-improve comparison inside the brief and the bridge from judgments into the next
-contract/context.
+The MVP protocol loop is present: contracts, workstreams, remote ingest,
+artifact packages, deterministic contract review, human judgment, and explicit
+Alexandria reference checks. The next useful work is dogfooding the loop on real
+contracts and tightening what breaks.

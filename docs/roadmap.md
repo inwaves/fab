@@ -26,12 +26,12 @@ Legend: `[x] done`, `[~] in progress`, `[ ] not started`.
 - [x] Human judgment record: capture what the researcher trusts, rejects, wants
   replicated, escalates, prevents from propagating, or feeds into a revised
   contract, with targets on workstreams, artifacts, and claims.
-- [~] Remote execution ingest boundary: `ingest-run` accepts completed bundles
-  and the Alexandria smoke fixture is covered by an integration test; the
-  separate ingester service is not started.
-- [ ] Batch comparison: surface convergence, contradictions, shared assumptions,
-  eval shortcuts, gaps, and replication needs.
-- [ ] Knowledge substrate interface: allow contracts and workstreams to reference
+- [x] Remote execution ingest boundary: `ingest-run` accepts completed bundles;
+  the Alexandria smoke fixture is covered by an integration test; the separate
+  ingester service exists with a JSONL ledger.
+- [x] Batch comparison: deterministic `contract_review` rollups exist in
+  `brief`; intelligent reviewer-agent synthesis is deferred.
+- [x] Knowledge substrate interface: allow contracts and workstreams to reference
   prior knowledge and artefacts through adapters without turning Fab into a
   generic knowledge substrate.
 
@@ -39,14 +39,17 @@ Deferred:
 
 - [ ] Workstream fan-out / programme shape: figure out only after the local MVP
   brief and judgment loop is useful.
+- [ ] Agent-based readout / reviewer synthesis: an artifact-producing reviewer
+  agent that reads the contract-scoped corpus and produces a digestible
+  synthesis for human judgment.
+- [ ] Production ingester hardening: supervision, operator visibility, repair
+  workflow, and locking for multiple ingester instances.
 - [ ] Promotion layer: controlled reuse of validated results across workstreams.
 - [ ] Full consolidation system: large-scale duplicate, contradiction, lineage,
   and dependency analysis across many programmes.
 - [ ] UI/dashboard: only after the protocol loop is valuable in local form.
 
-Current focus: connect the local ingest primitive to the Alexandria substrate
-through a small ingester service, then make the brief useful for comparison and
-loop closure.
+Current focus: dogfood the MVP loop on real contracts and agent outputs.
 
 ## Product Target
 
@@ -86,10 +89,9 @@ The repo contains a local, file-backed skeleton:
 The current code exposes `attention`, `brief`, `show --brief`, `judge`, and
 `ingest-run` commands. They are still local skeletons for the protocol objects.
 
-The current code can ingest one completed bundle from disk, including the
-durable Alexandria smoke fixture. The next boundary is a separate ingester
-service that watches Alexandria commits so agents can publish bundles without
-cloning Fab.
+The current code can ingest completed bundles from disk, including the durable
+Alexandria smoke fixture. A separate ingester service can scan Alexandria for
+completed bundles, keep an ingest ledger, and call the same validation path.
 
 ## Build Sequence
 
@@ -177,8 +179,7 @@ primarily a command to a specific agent.
 
 ### 4. Remote Execution Ingest
 
-Status: local ingest primitive present; Alexandria smoke fixture test present;
-separate ingester service not started.
+Status: MVP complete.
 
 The Maestro branch proved that an external agent can produce useful Fab-shaped
 work: claims, evidence, limitations, follow-up, and an artifact bundle. It did
@@ -219,22 +220,23 @@ Implemented:
   `artifacts/safety-finetuning-pilot/ws_001/fab-ingest-smoke-001/`;
 - an integration test that seeds a temporary Fab pilot store and ingests that
   fixture through the CLI.
-
-Next build target:
-
-- a small Alexandria ingester service for new bundles committed under
-  `artifacts/<program>/<workstream_id>/<run_id>/`.
+- `services.alexandria_ingester`, which scans Alexandria, ingests completed
+  bundles, records packet ids or errors, and skips already-ingested bundle
+  paths through an append-only JSONL ledger.
 
 The ingester should reuse the same validation path as manual ingest. Fab should
 record the artifact bundle root and manifest metadata; it should not assume
-research artifacts live inside the Fab framework repo. The service can be a
+research artifacts live inside the Fab framework repo. The service remains a
 deployment concern around Fab rather than a core Fab command.
+
+Production hardening is deferred. For the MVP, ingestion is complete.
 
 ### 5. Batch Comparison
 
-Status: not started.
+Status: MVP complete.
 
-Before a human reads the batch, Fab should compare workstreams and surface:
+Before a human reads the contract-scoped corpus, Fab should compare workstreams
+and surface:
 
 - independent convergence;
 - contradictions;
@@ -245,13 +247,27 @@ Before a human reads the batch, Fab should compare workstreams and surface:
 - untested branches;
 - artefacts needing replication or critique.
 
-This should be useful before a formal consolidation layer exists. It should stay
-inside the brief path for now rather than becoming a separate fan-out or
-programme-shape component.
+The MVP implementation stays deterministic inside the brief path. It currently
+adds `contract_review`, which rolls up:
+
+- artifact statuses;
+- repeated claims by normalized exact text;
+- shared limitations;
+- shared `used_refs`;
+- unreviewed claims and artifacts;
+- human judgment queues such as `needs-replication`, `needs-critique`,
+  `do-not-propagate`, `safe-as-context`, and `trusted-local`.
+
+This substrate intentionally does not infer semantic contradiction or importance.
+The intelligent reviewer/comparison agent is deferred as the agent-based readout
+function. That agent would read the contract, workstreams, artifacts, human
+judgments, and selected Alexandria context, then emit a synthesis artifact for
+Fab to ingest and the human to judge. It should make understanding easier to
+arrive at, not replace the researcher's judgment.
 
 ### 6. Knowledge Substrate Interface
 
-Status: design only.
+Status: MVP complete.
 
 Fab needs access to prior knowledge: previous experiments, artefacts, code,
 human judgments, papers, and research notes. Alexandria is the public MVP
@@ -269,18 +285,22 @@ cares about exact context, they should put an exact URI or path in the contract.
 Fab should resolve explicit references, record what version was used, and later
 compare that with the references an agent says it used.
 
-Initial build target:
+Implemented:
 
-- source registry with aliases such as `alexandria://`, `fab://`, and `s3://`;
-- resolution snapshots for explicit references in contracts and workstreams;
+- source registry with aliases such as `alexandria://`;
+- resolution snapshots for explicit references in contracts;
 - `refs check` for unresolved, dirty, unpinned, or unsafe explicit references;
-- `context show` for the contract plus resolved explicit references;
 - ingest support for `used_refs`;
-- brief surface for missing, stale, unresolved, or unreviewed references.
+- brief surface for unresolved references, refs used by agents, refs used but
+  not explicit in the contract, and explicit refs not used by agents.
 
-Later build target:
+Deferred:
 
+- context-package builder;
+- broader source adapters such as object stores;
+- reference-aware human judgments;
 - adapter-driven export of human-approved Alexandria updates.
+
 
 ## Design Warnings
 
@@ -294,12 +314,7 @@ Later build target:
 
 ## Immediate Next Actions
 
-1. Add a small Alexandria ingester service over the same validation path as
-   `ingest-run`.
-2. Improve comparison inside `fab brief`: convergence, contradictions, shared
-   assumptions, repeated failures, shortcut risk, and replication needs.
-3. Turn `next_context` into a clearer bridge from judgments to the next contract
-   or context package.
-4. Add a thin prior-knowledge/reference interface with Alexandria as the public
-   adapter target.
-5. Leave workstream fan-out/programme shape as a later design problem.
+1. Dogfood the full MVP loop on a real contract and real agent bundles.
+2. Tighten whatever breaks during that run.
+3. Leave workstream fan-out/programme shape, reviewer readout, promotion, and
+   production hardening as later design problems.

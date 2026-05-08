@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import re
 import stat
+import hashlib
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -22,6 +24,8 @@ REMOTE_RUN_STATUSES = {"completed", "completed_with_limitations", "failed"}
 RELATIONSHIP_LIST_FIELDS = {"children", "related", "blocks", "blocked_by"}
 READ_ONLY_FILE_MODE = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+URI_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9+.-]*://[^\s<>\]`\"']+")
+TRAILING_URI_PUNCTUATION = ".,;:"
 REVIEW_REASONS = {
     "no_contract",
     "missing_contract_file",
@@ -286,6 +290,10 @@ class RegistryStore:
     def contracts_dir(self) -> Path:
         return self.root / "contracts"
 
+    @property
+    def sources_path(self) -> Path:
+        return self.root / "sources.json"
+
     def init(self) -> None:
         for path in [
             self.workstreams_dir,
@@ -295,6 +303,39 @@ class RegistryStore:
             self.contracts_dir,
         ]:
             path.mkdir(parents=True, exist_ok=True)
+
+    def read_sources(self) -> dict[str, Any]:
+        if not self.sources_path.exists():
+            return {"sources": {}}
+        data = read_json(self.sources_path)
+        sources = data.get("sources")
+        if not isinstance(sources, dict):
+            raise RegistryError("sources registry must contain a sources object")
+        return {"sources": sources}
+
+    def write_sources(self, data: dict[str, Any]) -> None:
+        write_json(self.sources_path, data)
+
+    def add_source(self, name: str, path: str | Path, *, uri_prefix: str) -> dict[str, Any]:
+        self.init()
+        ensure_safe_id("source name", name)
+        if not uri_prefix:
+            raise RegistryError("source uri prefix is required")
+        source_path = Path(path).expanduser()
+        data = self.read_sources()
+        source = {
+            "name": name,
+            "path": str(source_path),
+            "uri_prefix": uri_prefix,
+        }
+        data["sources"][name] = source
+        self.write_sources(data)
+        return source
+
+    def list_sources(self) -> list[dict[str, Any]]:
+        self.ensure_ready()
+        sources = self.read_sources()["sources"]
+        return [sources[name] for name in sorted(sources)]
 
     def workstream_path(self, workstream_id: str) -> Path:
         return self.workstreams_dir / f"{workstream_id}.json"
@@ -567,7 +608,7 @@ class RegistryStore:
                         )
                     )
 
-        return {
+        result = {
             "generated_at": now.isoformat().replace("+00:00", "Z"),
             "filters": {
                 "program": program,
@@ -580,12 +621,179 @@ class RegistryStore:
                 "artifacts": len(artifacts),
                 "claims": len(claims),
                 "decisions": len(decisions),
+                "explicit_refs": None,
+                "used_refs": None,
             },
             "attention": attention,
             "workstreams": summaries,
             "artifacts": artifacts,
             "claims": claims,
+            "contract_review": contract_review_from_brief(
+                summaries,
+                artifacts,
+                claims,
+                decisions,
+            ),
             "next_context": next_context_from_decisions(decisions),
+        }
+        result["references"] = self.reference_review(summaries, artifacts)
+        result["counts"]["explicit_refs"] = len(result["references"]["explicit_refs"])
+        result["counts"]["used_refs"] = len(result["references"]["used_refs"])
+        return result
+
+    def check_references(
+        self,
+        *,
+        contract_id: str | None = None,
+        version: int | None = None,
+        workstream_id: str | None = None,
+    ) -> dict[str, Any]:
+        self.ensure_ready()
+        if bool(workstream_id) == bool(contract_id):
+            raise RegistryError("specify exactly one of workstream_id or contract_id")
+
+        if workstream_id:
+            entry = self.get_workstream(workstream_id)
+            live_state = self.get_live_state(workstream_id)
+            contract = entry.get("contract") or {}
+            contract_id = contract.get("id")
+            version = contract.get("version")
+            contract_refs: list[dict[str, Any]] = []
+            if contract_id and version is not None:
+                contract_text = self.read_contract_version(contract_id, version)
+                contract_refs = self.contract_reference_entries(
+                    contract_id,
+                    version,
+                    contract_text,
+                )
+            used_refs = self.used_reference_entries(
+                [
+                    brief_artifact_summary(
+                        workstream_id,
+                        artifact,
+                        self.list_decisions(workstream_id),
+                    )
+                    for artifact in live_state.get("artifacts", [])
+                ]
+            )
+            return reference_check_result(
+                {
+                    "type": "workstream",
+                    "workstream_id": workstream_id,
+                    "contract": {"id": contract_id, "version": version},
+                },
+                contract_refs,
+                used_refs,
+            )
+
+        if version is None:
+            raise RegistryError(f"contract version is required for {contract_id}")
+        contract_text = self.read_contract_version(str(contract_id), version)
+        contract_refs = self.contract_reference_entries(str(contract_id), version, contract_text)
+        return reference_check_result(
+            {
+                "type": "contract",
+                "contract": {"id": contract_id, "version": version},
+            },
+            contract_refs,
+            [],
+        )
+
+    def reference_review(
+        self,
+        workstreams: list[dict[str, Any]],
+        artifacts: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        contract_refs: list[dict[str, Any]] = []
+        seen_contracts: set[tuple[str, int]] = set()
+        for workstream in workstreams:
+            contract = workstream.get("contract") or {}
+            contract_id = contract.get("id")
+            version = contract.get("version")
+            if not contract_id or version is None:
+                continue
+            key = (str(contract_id), int(version))
+            if key in seen_contracts:
+                continue
+            seen_contracts.add(key)
+            try:
+                contract_text = self.read_contract_version(key[0], key[1])
+            except RegistryError:
+                contract_refs.append(
+                    {
+                        "contract": {"id": key[0], "version": key[1]},
+                        "uri": None,
+                        "resolution": {
+                            "status": "unresolved",
+                            "error": "contract version could not be read",
+                        },
+                    }
+                )
+                continue
+            contract_refs.extend(self.contract_reference_entries(key[0], key[1], contract_text))
+        return reference_check_result(
+            {"type": "brief"},
+            contract_refs,
+            self.used_reference_entries(artifacts),
+        )
+
+    def contract_reference_entries(
+        self,
+        contract_id: str,
+        version: int,
+        text: str,
+    ) -> list[dict[str, Any]]:
+        return [
+            {
+                "contract": {"id": contract_id, "version": version},
+                "uri": uri,
+                "resolution": self.resolve_reference(uri),
+            }
+            for uri in extract_explicit_uris(text)
+        ]
+
+    def used_reference_entries(self, artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        entries = []
+        for artifact in artifacts:
+            for uri in artifact.get("used_refs", []):
+                entries.append(
+                    {
+                        "workstream_id": artifact.get("workstream_id"),
+                        "artifact_id": artifact.get("id"),
+                        "uri": uri,
+                        "resolution": self.resolve_reference(uri),
+                    }
+                )
+        return entries
+
+    def resolve_reference(self, uri: str) -> dict[str, Any]:
+        sources = self.read_sources()["sources"]
+        for source_name, source in sorted(sources.items()):
+            prefix = source.get("uri_prefix")
+            if not prefix or not uri.startswith(prefix):
+                continue
+            return resolve_source_uri(source_name, source, uri)
+        if uri.startswith(("http://", "https://")):
+            return {
+                "status": "external",
+                "uri": uri,
+                "source": "http",
+                "title": None,
+                "content_hash": None,
+                "git_commit": None,
+                "git_dirty": None,
+                "path": None,
+            }
+        return {
+            "status": "unresolved",
+            "uri": uri,
+            "source": None,
+            "title": None,
+            "content_hash": None,
+            "git_commit": None,
+            "git_dirty": None,
+            "path": None,
+            "error": "no configured source matches URI prefix",
         }
 
     def set_status(self, workstream_id: str, status: str) -> dict[str, Any]:
@@ -946,6 +1154,8 @@ def brief_artifact_summary(
         "kind": artifact.get("kind"),
         "path": artifact.get("path"),
         "description": artifact.get("description"),
+        "produced_by": artifact.get("produced_by"),
+        "created_at": artifact.get("created_at"),
         "claims": len(artifact.get("claims", [])),
         "evidence": len(artifact.get("evidence", [])),
         "uncertainty": artifact.get("uncertainty"),
@@ -1034,6 +1244,363 @@ def next_context_from_decisions(decisions: list[dict[str, Any]]) -> dict[str, li
                 }
             )
     return context
+
+
+def extract_explicit_uris(text: str) -> list[str]:
+    uris = []
+    for match in URI_RE.finditer(text):
+        uri = match.group(0).rstrip(TRAILING_URI_PUNCTUATION)
+        while uri.endswith(")") and uri.count("(") < uri.count(")"):
+            uri = uri[:-1]
+        if uri and uri not in uris:
+            uris.append(uri)
+    return uris
+
+
+def sha256_path(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return f"sha256:{digest.hexdigest()}"
+
+
+def git_output(repo: Path, *args: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return result.stdout.strip() or None
+
+
+def git_dirty(repo: Path) -> bool | None:
+    output = git_output(repo, "status", "--short")
+    if output is None:
+        return None
+    return bool(output)
+
+
+def git_commit_for_path(repo: Path, path: Path) -> str | None:
+    try:
+        relpath = path.relative_to(repo)
+    except ValueError:
+        return None
+    return git_output(repo, "log", "-n", "1", "--format=%H", "--", str(relpath))
+
+
+def strip_yaml_quotes(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def markdown_title(text: str) -> str | None:
+    if text.startswith("---\n"):
+        end = text.find("\n---\n", 4)
+        if end != -1:
+            for line in text[4:end].splitlines():
+                if line.startswith("title:"):
+                    title = strip_yaml_quotes(line.split(":", 1)[1])
+                    if title:
+                        return title
+    for line in text.splitlines():
+        if line.startswith("# "):
+            title = line[2:].strip()
+            if title:
+                return title
+    return None
+
+
+def resolve_source_uri(source_name: str, source: dict[str, Any], uri: str) -> dict[str, Any]:
+    prefix = str(source.get("uri_prefix") or "")
+    root = Path(str(source.get("path") or "")).expanduser().resolve()
+    rel = uri[len(prefix):].lstrip("/")
+    path = (root / rel).resolve()
+    base = {
+        "uri": uri,
+        "source": source_name,
+        "path": str(path),
+        "title": None,
+        "content_hash": None,
+        "git_commit": None,
+        "git_dirty": git_dirty(root) if root.exists() else None,
+    }
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return {
+            **base,
+            "status": "unresolved",
+            "error": "resolved path escapes source root",
+        }
+    if not path.is_file():
+        return {
+            **base,
+            "status": "unresolved",
+            "error": "referenced file does not exist",
+        }
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return {
+        **base,
+        "status": "resolved",
+        "title": markdown_title(text),
+        "content_hash": sha256_path(path),
+        "git_commit": git_commit_for_path(root, path),
+    }
+
+
+def uri_values(entries: list[dict[str, Any]]) -> list[str]:
+    return sorted({entry["uri"] for entry in entries if entry.get("uri")})
+
+
+def reference_check_result(
+    scope: dict[str, Any],
+    explicit_refs: list[dict[str, Any]],
+    used_refs: list[dict[str, Any]],
+) -> dict[str, Any]:
+    explicit_uris = set(uri_values(explicit_refs))
+    used_uris = set(uri_values(used_refs))
+    unresolved_explicit = [
+        entry for entry in explicit_refs
+        if entry.get("resolution", {}).get("status") == "unresolved"
+    ]
+    unresolved_used = [
+        entry for entry in used_refs
+        if entry.get("resolution", {}).get("status") == "unresolved"
+    ]
+    return {
+        "scope": scope,
+        "explicit_refs": explicit_refs,
+        "used_refs": used_refs,
+        "comparison": {
+            "explicit_uris": sorted(explicit_uris),
+            "used_uris": sorted(used_uris),
+            "used_not_explicit": sorted(used_uris - explicit_uris),
+            "explicit_not_used": sorted(explicit_uris - used_uris),
+            "unresolved_explicit": unresolved_explicit,
+            "unresolved_used": unresolved_used,
+        },
+    }
+
+
+def normalized_comparison_text(value: str | None) -> str:
+    text = " ".join(str(value or "").casefold().split())
+    return text.strip(" \t\r\n.,;:")
+
+
+def sorted_unique(values: list[str]) -> list[str]:
+    return sorted({value for value in values if value})
+
+
+def artifact_ref_from_summary(artifact: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "workstream_id": artifact.get("workstream_id"),
+        "artifact_id": artifact.get("id"),
+        "path": artifact.get("path"),
+        "status": artifact.get("status"),
+        "produced_by": artifact.get("produced_by"),
+    }
+
+
+def claim_ref_from_summary(
+    claim: dict[str, Any],
+    artifact_lookup: dict[tuple[str | None, str | None], dict[str, Any]],
+) -> dict[str, Any]:
+    artifact = artifact_lookup.get((claim.get("workstream_id"), claim.get("artifact_id")), {})
+    return {
+        "workstream_id": claim.get("workstream_id"),
+        "artifact_id": claim.get("artifact_id"),
+        "claim_id": claim.get("id"),
+        "ref": claim.get("ref"),
+        "text": claim.get("text"),
+        "confidence": claim.get("confidence"),
+        "artifact_status": artifact.get("status"),
+        "judgment_actions": [
+            decision.get("action")
+            for decision in claim.get("judgments", [])
+            if decision.get("action")
+        ],
+    }
+
+
+def grouped_claims(
+    claims: list[dict[str, Any]],
+    artifact_lookup: dict[tuple[str | None, str | None], dict[str, Any]],
+) -> list[dict[str, Any]]:
+    groups: dict[str, dict[str, Any]] = {}
+    for claim in claims:
+        key = normalized_comparison_text(claim.get("text"))
+        if not key:
+            continue
+        group = groups.setdefault(
+            key,
+            {
+                "key": key,
+                "text": claim.get("text"),
+                "count": 0,
+                "workstreams": [],
+                "artifacts": [],
+                "judgment_actions": [],
+                "artifact_statuses": [],
+                "claims": [],
+            },
+        )
+        artifact = artifact_lookup.get((claim.get("workstream_id"), claim.get("artifact_id")), {})
+        group["count"] += 1
+        group["workstreams"].append(str(claim.get("workstream_id") or ""))
+        artifact_ref = "/".join(
+            str(value)
+            for value in [claim.get("workstream_id"), claim.get("artifact_id")]
+            if value
+        )
+        group["artifacts"].append(artifact_ref)
+        if artifact.get("status"):
+            group["artifact_statuses"].append(str(artifact["status"]))
+        for decision in claim.get("judgments", []):
+            if decision.get("action"):
+                group["judgment_actions"].append(str(decision["action"]))
+        group["claims"].append(claim_ref_from_summary(claim, artifact_lookup))
+
+    result = []
+    for group in groups.values():
+        result.append(
+            {
+                **group,
+                "workstreams": sorted_unique(group["workstreams"]),
+                "artifacts": sorted_unique(group["artifacts"]),
+                "judgment_actions": sorted_unique(group["judgment_actions"]),
+                "artifact_statuses": sorted_unique(group["artifact_statuses"]),
+            }
+        )
+    return sorted(result, key=lambda item: (-item["count"], item["text"] or ""))
+
+
+def grouped_artifact_strings(
+    artifacts: list[dict[str, Any]],
+    field: str,
+    *,
+    key_name: str,
+) -> list[dict[str, Any]]:
+    groups: dict[str, dict[str, Any]] = {}
+    for artifact in artifacts:
+        for value in artifact.get(field, []):
+            key = normalized_comparison_text(value)
+            if not key:
+                continue
+            group = groups.setdefault(
+                key,
+                {
+                    key_name: value,
+                    "count": 0,
+                    "workstreams": [],
+                    "artifacts": [],
+                },
+            )
+            group["count"] += 1
+            group["workstreams"].append(str(artifact.get("workstream_id") or ""))
+            group["artifacts"].append(artifact_ref_from_summary(artifact))
+
+    result = []
+    for group in groups.values():
+        result.append({**group, "workstreams": sorted_unique(group["workstreams"])})
+    return sorted(result, key=lambda item: (-item["count"], item[key_name] or ""))
+
+
+def grouped_artifact_statuses(artifacts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: dict[str, dict[str, Any]] = {}
+    for artifact in artifacts:
+        status = artifact.get("status") or "unknown"
+        group = groups.setdefault(status, {"status": status, "count": 0, "artifacts": []})
+        group["count"] += 1
+        group["artifacts"].append(artifact_ref_from_summary(artifact))
+    return sorted(groups.values(), key=lambda item: (-item["count"], item["status"]))
+
+
+def contract_review_from_brief(
+    workstreams: list[dict[str, Any]],
+    artifacts: list[dict[str, Any]],
+    claims: list[dict[str, Any]],
+    decisions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    artifact_lookup = {
+        (artifact.get("workstream_id"), artifact.get("id")): artifact
+        for artifact in artifacts
+    }
+    claim_groups = grouped_claims(claims, artifact_lookup)
+    limitation_groups = grouped_artifact_strings(
+        artifacts,
+        "limitations",
+        key_name="limitation",
+    )
+    used_ref_groups = grouped_artifact_strings(
+        artifacts,
+        "used_refs",
+        key_name="ref",
+    )
+    artifact_statuses = grouped_artifact_statuses(artifacts)
+    next_context = next_context_from_decisions(decisions)
+    unreviewed_artifacts = [
+        artifact_ref_from_summary(artifact)
+        for artifact in artifacts
+        if not artifact.get("judgments")
+    ]
+    unreviewed_claims = [
+        claim_ref_from_summary(claim, artifact_lookup)
+        for claim in claims
+        if not claim.get("judgments")
+    ]
+    repeated_claims = [group for group in claim_groups if group["count"] > 1]
+    shared_limitations = [group for group in limitation_groups if group["count"] > 1]
+    shared_refs = [group for group in used_ref_groups if group["count"] > 1]
+    summary = [
+        f"{len(artifacts)} artifacts across {len(workstreams)} workstreams.",
+        f"{len(repeated_claims)} repeated claim groups by normalized exact text.",
+        f"{len(shared_limitations)} shared limitation groups.",
+        f"{len(shared_refs)} shared used-reference groups.",
+        (
+            "No deterministic contradiction inference yet; tensions require "
+            "human judgment or a later reviewer-agent pass."
+        ),
+    ]
+    return {
+        "mode": "deterministic",
+        "scope": {
+            "workstreams": len(workstreams),
+            "artifacts": len(artifacts),
+            "claims": len(claims),
+        },
+        "summary": summary,
+        "artifact_statuses": artifact_statuses,
+        "claim_groups": claim_groups,
+        "repeated_claims": repeated_claims,
+        "limitation_groups": limitation_groups,
+        "shared_limitations": shared_limitations,
+        "used_ref_groups": used_ref_groups,
+        "shared_used_refs": shared_refs,
+        "review_queue": {
+            "needs_replication": next_context["needs_replication"],
+            "needs_critique": next_context["needs_critique"],
+            "do_not_propagate": next_context["do_not_propagate"],
+            "safe_as_context": next_context["safe_as_context"],
+            "trusted_local": next_context["trusted_local"],
+            "unreviewed_artifacts": unreviewed_artifacts,
+            "unreviewed_claims": unreviewed_claims,
+        },
+        "tensions": {
+            "explicit": [],
+            "note": (
+                "This deterministic pass does not infer semantic contradictions. "
+                "It only exposes repeated text, shared limitations, shared refs, "
+                "and human judgment targets."
+            ),
+        },
+    }
 
 
 def normalize_decision_target(

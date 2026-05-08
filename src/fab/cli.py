@@ -191,6 +191,9 @@ def print_brief(data: dict[str, Any]) -> None:
     else:
         print("-")
 
+    print_contract_review(data.get("contract_review", {}))
+    print_reference_review(data.get("references", {}))
+
     print("\nNext Context")
     next_context = data.get("next_context", {})
     printed = False
@@ -208,6 +211,100 @@ def print_brief(data: dict[str, Any]) -> None:
             )
     if not printed:
         print("-")
+
+
+def print_contract_review(review: dict[str, Any]) -> None:
+    print("\nContract Review")
+    if not review:
+        print("-")
+        return
+
+    print(f"mode: {review.get('mode', '-')}")
+    for item in review.get("summary", []):
+        print(f"- {item}")
+
+    repeated_claims = review.get("repeated_claims", [])
+    if repeated_claims:
+        print("repeated claims:")
+        for group in repeated_claims:
+            print(
+                f"- {group.get('count', 0)}x across "
+                f"{', '.join(group.get('workstreams', []))}: {group.get('text')}"
+            )
+
+    shared_limitations = review.get("shared_limitations", [])
+    if shared_limitations:
+        print("shared limitations:")
+        for group in shared_limitations:
+            print(f"- {group.get('count', 0)}x: {group.get('limitation')}")
+
+    shared_refs = review.get("shared_used_refs", [])
+    if shared_refs:
+        print("shared refs:")
+        for group in shared_refs:
+            print(f"- {group.get('count', 0)}x: {group.get('ref')}")
+
+    queue = review.get("review_queue", {})
+    needs_replication = queue.get("needs_replication", [])
+    needs_critique = queue.get("needs_critique", [])
+    do_not_propagate = queue.get("do_not_propagate", [])
+    if needs_replication or needs_critique or do_not_propagate:
+        print(
+            "review queue: "
+            f"needs_replication={len(needs_replication)} "
+            f"needs_critique={len(needs_critique)} "
+            f"do_not_propagate={len(do_not_propagate)}"
+        )
+
+
+def print_reference_review(review: dict[str, Any]) -> None:
+    print("\nReferences")
+    if not review:
+        print("-")
+        return
+    comparison = review.get("comparison", {})
+    print(
+        "counts: "
+        f"explicit={len(review.get('explicit_refs', []))} "
+        f"used={len(review.get('used_refs', []))} "
+        f"used_not_explicit={len(comparison.get('used_not_explicit', []))} "
+        f"explicit_not_used={len(comparison.get('explicit_not_used', []))}"
+    )
+    unresolved = comparison.get("unresolved_explicit", []) + comparison.get("unresolved_used", [])
+    if unresolved:
+        print("unresolved:")
+        for item in unresolved:
+            resolution = item.get("resolution", {})
+            print(f"- {item.get('uri')}: {resolution.get('error') or resolution.get('status')}")
+    if comparison.get("used_not_explicit"):
+        print("used refs not explicit in contract:")
+        for uri in comparison["used_not_explicit"]:
+            print(f"- {uri}")
+    if comparison.get("explicit_not_used"):
+        print("explicit contract refs not used:")
+        for uri in comparison["explicit_not_used"]:
+            print(f"- {uri}")
+
+
+def print_sources(sources: list[dict[str, Any]]) -> None:
+    if not sources:
+        print("sources: -")
+        return
+    print("name\turi_prefix\tpath")
+    for source in sources:
+        print(f"{source.get('name')}\t{source.get('uri_prefix')}\t{source.get('path')}")
+
+
+def print_refs_check(data: dict[str, Any]) -> None:
+    scope = data.get("scope", {})
+    if scope.get("type") == "contract":
+        contract = scope.get("contract", {})
+        print(f"refs\tcontract:{contract.get('id')}/v{contract.get('version')}")
+    elif scope.get("type") == "workstream":
+        print(f"refs\tworkstream:{scope.get('workstream_id')}")
+    else:
+        print("refs")
+    print_reference_review(data)
 
 
 def print_list(label: str, values: list[Any]) -> None:
@@ -312,6 +409,25 @@ def build_parser() -> argparse.ArgumentParser:
     list_cmd.add_argument("--status", choices=sorted(VALID_STATUSES))
     list_cmd.add_argument("--program")
     list_cmd.add_argument("--json", action="store_true")
+
+    sources = sub.add_parser("sources", help="manage external source adapters")
+    sources_sub = sources.add_subparsers(dest="sources_command", required=True)
+    sources_add = sources_sub.add_parser("add", help="register a source URI prefix")
+    sources_add.add_argument("name")
+    sources_add.add_argument("path")
+    sources_add.add_argument("--uri-prefix", required=True)
+    sources_add.add_argument("--json", action="store_true")
+    sources_list = sources_sub.add_parser("list", help="list configured sources")
+    sources_list.add_argument("--json", action="store_true")
+
+    refs = sub.add_parser("refs", help="check explicit prior-context references")
+    refs_sub = refs.add_subparsers(dest="refs_command", required=True)
+    refs_check = refs_sub.add_parser("check", help="resolve explicit references")
+    target = refs_check.add_mutually_exclusive_group(required=True)
+    target.add_argument("--workstream-id")
+    target.add_argument("--contract-id")
+    refs_check.add_argument("--version", type=int)
+    refs_check.add_argument("--json", action="store_true")
 
     attention = sub.add_parser("attention", help="list workstreams needing human attention")
     attention.add_argument("--status", choices=sorted(VALID_STATUSES))
@@ -445,6 +561,30 @@ def main(argv: list[str] | None = None) -> int:
                 for item in result:
                     print_workstream_row(item)
             return 0
+
+        if args.command == "sources":
+            if args.sources_command == "add":
+                result = store.add_source(
+                    args.name,
+                    args.path,
+                    uri_prefix=args.uri_prefix,
+                )
+                print_json(result) if args.json else print(f"Added source {result['name']}")
+                return 0
+            if args.sources_command == "list":
+                result = store.list_sources()
+                print_json(result) if args.json else print_sources(result)
+                return 0
+
+        if args.command == "refs":
+            if args.refs_command == "check":
+                result = store.check_references(
+                    contract_id=args.contract_id,
+                    version=args.version,
+                    workstream_id=args.workstream_id,
+                )
+                print_json(result) if args.json else print_refs_check(result)
+                return 0
 
         if args.command == "attention":
             result = store.review_workstreams(

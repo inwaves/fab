@@ -154,9 +154,24 @@ store.
 
 ## Alexandria Ingester Service
 
-The next implementation should be a small service around this boundary, not
-necessarily a Fab CLI command. It can live in deployment code or a thin service
-repo and depend on Fab as a package or shell out to `fab ingest-run`.
+The current implementation is a small service around this boundary, not a Fab
+CLI command:
+
+```bash
+uv run python -m services.alexandria_ingester \
+  --alexandria ../alexandria \
+  --store .fab
+```
+
+It can run once, or poll:
+
+```bash
+uv run python -m services.alexandria_ingester \
+  --alexandria ../alexandria \
+  --store .fab \
+  --pull \
+  --poll-interval 60
+```
 
 For the Alexandria MVP, the service should:
 
@@ -168,6 +183,15 @@ For the Alexandria MVP, the service should:
 - record the Alexandria commit, bundle relative path, manifest hash, ingest
   status, packet id, and any error;
 - surface errors without rewriting agent output.
+
+The current service implements this as an append-only JSONL ledger under:
+
+```text
+<fab-store>/ingest-ledger/alexandria.jsonl
+```
+
+Successful ledger entries block re-ingest by bundle relative path. Error entries
+do not block retry.
 
 The loop is deliberately boring:
 

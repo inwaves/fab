@@ -34,6 +34,31 @@ A useful brief should answer:
 The brief should allocate attention. It should not ask the human to read every
 packet in order.
 
+## Deterministic Contract Review
+
+The current brief includes a deterministic `contract_review` section. This is a
+substrate for comparison, not a replacement for a researcher's synthesis.
+
+It currently rolls up:
+
+- artifact statuses across the selected contract/program scope;
+- repeated claims by normalized exact text;
+- shared limitations;
+- shared `used_refs`;
+- claims and artifacts without human judgment;
+- targets already marked `needs-replication`, `needs-critique`,
+  `do-not-propagate`, `safe-as-context`, or `trusted-local`.
+
+The pass is intentionally humble. It does not infer semantic agreement, deep
+contradiction, or importance. If two artifacts phrase the same claim
+differently, this deterministic pass may not group them. If two artifacts
+conflict implicitly, this pass may not see the conflict.
+
+The deferred design choice is a reviewer/comparison agent that reads the
+contract-scoped corpus and emits its own synthesis artifact. That agent should
+make the human's reading problem smaller, but its output should still be
+ingested, inspectable, and judged like any other artifact.
+
 ## Human Judgment
 
 Often the agent that produced the work is gone. Human judgment attaches to the
