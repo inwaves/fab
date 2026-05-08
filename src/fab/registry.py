@@ -17,6 +17,7 @@ VALID_STATUSES = {
     "completed",
     "quarantined",
 }
+REMOTE_RUN_STATUSES = {"completed", "completed_with_limitations", "failed"}
 
 RELATIONSHIP_LIST_FIELDS = {"children", "related", "blocks", "blocked_by"}
 READ_ONLY_FILE_MODE = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
@@ -27,6 +28,7 @@ REVIEW_REASONS = {
     "no_state_packet",
     "missing_rationale",
     "blocked",
+    "limited",
     "flagged",
     "deviated",
     "review_due",
@@ -137,6 +139,123 @@ def normalize_string_list(value: Any, *, label: str) -> list[str]:
     if not isinstance(value, list):
         raise RegistryError(f"{label} must be a list")
     return [str(item) for item in value if item]
+
+
+def require_manifest_field(manifest: dict[str, Any], field: str) -> Any:
+    if field not in manifest:
+        raise RegistryError(f"run manifest missing field: {field}")
+    return manifest[field]
+
+
+def normalize_manifest_string(value: Any, *, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise RegistryError(f"run manifest {label} must be a non-empty string")
+    return value
+
+
+def normalize_manifest_string_list(value: Any, *, label: str) -> list[str]:
+    if not isinstance(value, list):
+        raise RegistryError(f"run manifest {label} must be a list")
+    normalized = []
+    for item in value:
+        if not isinstance(item, str):
+            raise RegistryError(f"run manifest {label} entries must be strings")
+        if item.strip():
+            normalized.append(item)
+    return normalized
+
+
+def normalize_run_contract(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise RegistryError("run manifest contract must be an object")
+    contract_id = normalize_manifest_string(value.get("id"), label="contract.id")
+    ensure_safe_id("contract id", contract_id)
+    version = value.get("version")
+    if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+        raise RegistryError("run manifest contract.version must be a positive integer")
+    return {"id": contract_id, "version": version}
+
+
+def normalize_run_evidence(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        raise RegistryError("run manifest evidence must be a list")
+    normalized = []
+    for item in value:
+        if isinstance(item, str):
+            item = {"summary": item}
+        if not isinstance(item, dict):
+            raise RegistryError("run manifest evidence entries must be objects")
+        summary = normalize_manifest_string(item.get("summary"), label="evidence.summary")
+        evidence: dict[str, Any] = {"summary": summary}
+        path = item.get("path")
+        if path is not None:
+            evidence["path"] = normalize_manifest_string(path, label="evidence.path")
+        normalized.append(evidence)
+    return normalized
+
+
+def normalize_run_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(manifest, dict):
+        raise RegistryError("run manifest must be an object")
+
+    workstream_id = normalize_manifest_string(
+        require_manifest_field(manifest, "workstream_id"),
+        label="workstream_id",
+    )
+    ensure_safe_id("workstream id", workstream_id)
+
+    status = normalize_manifest_string(
+        require_manifest_field(manifest, "status"),
+        label="status",
+    )
+    if status not in REMOTE_RUN_STATUSES:
+        valid = ", ".join(sorted(REMOTE_RUN_STATUSES))
+        raise RegistryError(f"invalid run manifest status: {status}; valid: {valid}")
+
+    return {
+        "workstream_id": workstream_id,
+        "contract": normalize_run_contract(require_manifest_field(manifest, "contract")),
+        "source": normalize_manifest_string(
+            require_manifest_field(manifest, "source"),
+            label="source",
+        ),
+        "summary": normalize_manifest_string(
+            require_manifest_field(manifest, "summary"),
+            label="summary",
+        ),
+        "status": status,
+        "claims": normalize_manifest_string_list(
+            require_manifest_field(manifest, "claims"),
+            label="claims",
+        ),
+        "evidence": normalize_run_evidence(require_manifest_field(manifest, "evidence")),
+        "limitations": normalize_manifest_string_list(
+            require_manifest_field(manifest, "limitations"),
+            label="limitations",
+        ),
+        "next": normalize_manifest_string_list(
+            require_manifest_field(manifest, "next"),
+            label="next",
+        ),
+        "used_refs": normalize_manifest_string_list(
+            require_manifest_field(manifest, "used_refs"),
+            label="used_refs",
+        ),
+    }
+
+
+def validate_manifest_paths(bundle: Path, evidence: list[dict[str, Any]]) -> None:
+    for item in evidence:
+        raw_path = item.get("path")
+        if not raw_path:
+            continue
+        path = Path(raw_path)
+        if path.is_absolute() or ".." in path.parts:
+            raise RegistryError(f"run manifest path must be relative to bundle root: {raw_path}")
+        if "://" in raw_path:
+            raise RegistryError(f"run manifest path must be relative, not a URI: {raw_path}")
+        if not (bundle / path).exists():
+            raise RegistryError(f"run manifest path not found: {raw_path}")
 
 
 @dataclass(frozen=True)
@@ -428,6 +547,7 @@ class RegistryStore:
                     "rationale": live_state.get("rationale"),
                     "results": live_state.get("results", []),
                     "blockers": live_state.get("blockers", []),
+                    "limitations": live_state.get("limitations", []),
                     "flags": live_state.get("flags", []),
                     "deviations": live_state.get("deviations", []),
                 }
@@ -527,6 +647,7 @@ class RegistryStore:
         flag: list[str] | None = None,
         artifact: list[str] | None = None,
         artifact_ref: list[dict[str, Any]] | None = None,
+        limitation: list[str] | None = None,
     ) -> dict[str, Any]:
         entry = self.get_workstream(workstream_id)
         existing_packets = [path.stem for path in (self.packets_dir / workstream_id).glob("*.json")]
@@ -554,6 +675,7 @@ class RegistryStore:
             "blockers": blocker or [],
             "deviations": deviation or [],
             "flags": flag or [],
+            "limitations": limitation or [],
             "artifacts": artifacts,
         }
         write_json(self.packet_path(workstream_id, packet_id), packet)
@@ -564,6 +686,64 @@ class RegistryStore:
         entry["live_state"]["updated_at"] = now
         entry["timestamps"]["last_state_update_at"] = now
         self.save_workstream(entry)
+        return packet
+
+    def ingest_run_bundle(self, bundle_path: Path | str) -> dict[str, Any]:
+        bundle = Path(bundle_path)
+        if not bundle.is_dir():
+            raise RegistryError(f"run bundle is not a directory: {bundle}")
+        ready_path = bundle / "READY"
+        if not ready_path.exists():
+            raise RegistryError(f"run bundle is not ready: missing {ready_path}")
+
+        manifest_path = bundle / "manifest.json"
+        manifest = read_json(manifest_path)
+        run = normalize_run_manifest(manifest)
+
+        workstream_id = run["workstream_id"]
+        entry = self.get_workstream(workstream_id)
+        expected_contract = entry.get("contract") or {}
+        if expected_contract != run["contract"]:
+            raise RegistryError(
+                "run manifest contract does not match workstream contract: "
+                f"{run['contract']} != {expected_contract}"
+            )
+
+        artifact_dir = bundle / "artifact"
+        if not artifact_dir.is_dir():
+            raise RegistryError(f"run bundle artifact directory not found: {artifact_dir}")
+        validate_manifest_paths(bundle, run["evidence"])
+
+        artifact_ref = {
+            "path": str(artifact_dir),
+            "description": run["summary"],
+            "status": run["status"],
+            "claims": run["claims"],
+            "evidence": run["evidence"],
+            "limitations": run["limitations"],
+            "suggested_follow_up": run["next"],
+            "used_refs": run["used_refs"],
+        }
+        result = run["summary"] if run["status"] != "failed" else None
+        failed = run["summary"] if run["status"] == "failed" else None
+        next_action = "; ".join(run["next"]) if run["next"] else None
+        packet = self.add_state_packet(
+            workstream_id,
+            source=run["source"],
+            changed=f"ingested run bundle: {bundle}",
+            failed=failed,
+            result=result,
+            next_action=next_action,
+            rationale=run["summary"],
+            limitation=run["limitations"],
+            artifact_ref=[artifact_ref],
+        )
+        packet["ingest"] = {
+            "bundle_path": str(bundle),
+            "manifest_path": str(manifest_path),
+            "status": run["status"],
+        }
+        write_json(self.packet_path(workstream_id, packet["id"]), packet)
         return packet
 
     def list_packets(self, workstream_id: str) -> list[dict[str, Any]]:
@@ -638,6 +818,7 @@ def empty_live_state(workstream_id: str, state_id: str) -> dict[str, Any]:
         "results": [],
         "failed_attempts": [],
         "blockers": [],
+        "limitations": [],
         "deviations": [],
         "resource_usage": {},
         "next_intended_action": None,
@@ -734,6 +915,8 @@ def review_reasons(
         reasons.append("missing_rationale")
     if live_state.get("blockers"):
         reasons.append("blocked")
+    if live_state.get("limitations"):
+        reasons.append("limited")
     if live_state.get("flags"):
         reasons.append("flagged")
     if live_state.get("deviations"):
@@ -766,6 +949,9 @@ def brief_artifact_summary(
         "claims": len(artifact.get("claims", [])),
         "evidence": len(artifact.get("evidence", [])),
         "uncertainty": artifact.get("uncertainty"),
+        "status": artifact.get("status"),
+        "limitations": artifact.get("limitations", []),
+        "used_refs": artifact.get("used_refs", []),
         "review": artifact.get("review", {}),
         "judgments": matching_decisions(
             decisions,
@@ -966,13 +1152,22 @@ def normalize_artifact_ref(
             artifact.get("failed_attempts") or artifact.get("failures"),
             label="artifact failed_attempts",
         ),
+        "limitations": normalize_string_list(
+            artifact.get("limitations"),
+            label="artifact limitations",
+        ),
         "uncertainty": artifact.get("uncertainty"),
+        "status": artifact.get("status"),
         "reproduction": normalize_artifact_reproduction(artifact.get("reproduction")),
         "suggested_follow_up": normalize_string_list(
             artifact.get("suggested_follow_up") or artifact.get("follow_up"),
             label="artifact suggested_follow_up",
         ),
         "provenance": normalize_artifact_provenance(artifact.get("provenance")),
+        "used_refs": normalize_string_list(
+            artifact.get("used_refs"),
+            label="artifact used_refs",
+        ),
         "review": normalize_artifact_review(artifact.get("review")),
     }
 
@@ -1119,6 +1314,8 @@ def merge_packet_into_live_state(live_state: dict[str, Any], packet: dict[str, A
         append_unique(live_state.setdefault("failed_attempts", []), [packet["failed"]])
     if packet.get("blockers"):
         append_unique(live_state.setdefault("blockers", []), packet["blockers"])
+    if packet.get("limitations"):
+        append_unique(live_state.setdefault("limitations", []), packet["limitations"])
     if packet.get("deviations"):
         append_unique(live_state.setdefault("deviations", []), packet["deviations"])
     if packet.get("flags"):

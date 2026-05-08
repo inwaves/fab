@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+import json
 import stat
 import tempfile
 import unittest
 from pathlib import Path
 
 from fab.registry import RegistryError, RegistryStore
+
+
+def write_run_bundle(bundle: Path, manifest: dict, *, ready: bool = True) -> None:
+    artifact = bundle / "artifact"
+    (artifact / "code").mkdir(parents=True, exist_ok=True)
+    (artifact / "results").mkdir(parents=True, exist_ok=True)
+    (artifact / "logs").mkdir(parents=True, exist_ok=True)
+    (artifact / "report.md").write_text("# Report\n", encoding="utf-8")
+    (bundle / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    if ready:
+        (bundle / "READY").touch()
 
 
 class RegistryStoreTest(unittest.TestCase):
@@ -152,6 +164,129 @@ class RegistryStoreTest(unittest.TestCase):
             self.assertEqual(artifact["provenance"]["configs"], ["configs/refusal_eval.toml"])
             self.assertEqual(artifact["provenance"]["evals"], ["evals/refusal-fp-v1"])
             self.assertEqual(artifact["provenance"]["outputs"], ["runs/ws_001/baseline-report.md"])
+
+    def test_ingest_run_bundle_appends_packet_and_artifact_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RegistryStore.at(root / "store")
+            store.write_contract_version("contract_001", 1, "# Contract\n")
+            store.create_workstream(
+                title="A3 false-positive reduction",
+                program="safety-finetuning",
+                contract_id="contract_001",
+                contract_version=1,
+            )
+            bundle = root / "run-abc123"
+            write_run_bundle(
+                bundle,
+                {
+                    "workstream_id": "ws_001",
+                    "contract": {"id": "contract_001", "version": 1},
+                    "source": "podium/run-abc123",
+                    "summary": "Audited the baseline cluster claim.",
+                    "status": "completed_with_limitations",
+                    "claims": [
+                        "The baseline evidence currently supports seeded stability only."
+                    ],
+                    "evidence": [
+                        {
+                            "summary": "Report summarizes the stability audit.",
+                            "path": "artifact/report.md",
+                        }
+                    ],
+                    "limitations": ["Original model artifacts were unavailable."],
+                    "next": ["Rerun with the original model."],
+                    "used_refs": ["alexandria://papers/a3.md"],
+                },
+            )
+
+            packet = store.ingest_run_bundle(bundle)
+
+            self.assertEqual(packet["id"], "pkt_001")
+            self.assertEqual(packet["source"], "podium/run-abc123")
+            self.assertEqual(packet["result"], "Audited the baseline cluster claim.")
+            self.assertEqual(packet["limitations"], ["Original model artifacts were unavailable."])
+            self.assertEqual(packet["ingest"]["status"], "completed_with_limitations")
+
+            artifact = packet["artifacts"][0]
+            self.assertEqual(artifact["path"], str(bundle / "artifact"))
+            self.assertEqual(artifact["description"], "Audited the baseline cluster claim.")
+            self.assertEqual(artifact["status"], "completed_with_limitations")
+            self.assertEqual(
+                artifact["claims"][0]["text"],
+                "The baseline evidence currently supports seeded stability only.",
+            )
+            self.assertEqual(artifact["evidence"][0]["path"], "artifact/report.md")
+            self.assertEqual(artifact["limitations"], ["Original model artifacts were unavailable."])
+            self.assertEqual(artifact["suggested_follow_up"], ["Rerun with the original model."])
+            self.assertEqual(artifact["used_refs"], ["alexandria://papers/a3.md"])
+
+            live_state = store.get_live_state("ws_001")
+            self.assertEqual(live_state["limitations"], ["Original model artifacts were unavailable."])
+            self.assertIn("limited", store.review_workstreams()[0]["review"]["reasons"])
+
+    def test_ingest_run_bundle_requires_ready_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RegistryStore.at(root / "store")
+            store.write_contract_version("contract_001", 1, "# Contract\n")
+            store.create_workstream(
+                title="A3 false-positive reduction",
+                program="safety-finetuning",
+                contract_id="contract_001",
+                contract_version=1,
+            )
+            bundle = root / "run-abc123"
+            write_run_bundle(
+                bundle,
+                {
+                    "workstream_id": "ws_001",
+                    "contract": {"id": "contract_001", "version": 1},
+                    "source": "podium/run-abc123",
+                    "summary": "Audited the baseline cluster claim.",
+                    "status": "completed",
+                    "claims": [],
+                    "evidence": [],
+                    "limitations": [],
+                    "next": [],
+                    "used_refs": [],
+                },
+                ready=False,
+            )
+
+            with self.assertRaisesRegex(RegistryError, "missing .*READY"):
+                store.ingest_run_bundle(bundle)
+
+    def test_ingest_run_bundle_rejects_contract_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RegistryStore.at(root / "store")
+            store.write_contract_version("contract_001", 1, "# Contract\n")
+            store.create_workstream(
+                title="A3 false-positive reduction",
+                program="safety-finetuning",
+                contract_id="contract_001",
+                contract_version=1,
+            )
+            bundle = root / "run-abc123"
+            write_run_bundle(
+                bundle,
+                {
+                    "workstream_id": "ws_001",
+                    "contract": {"id": "contract_001", "version": 2},
+                    "source": "podium/run-abc123",
+                    "summary": "Audited the baseline cluster claim.",
+                    "status": "completed",
+                    "claims": [],
+                    "evidence": [],
+                    "limitations": [],
+                    "next": [],
+                    "used_refs": [],
+                },
+            )
+
+            with self.assertRaisesRegex(RegistryError, "contract does not match"):
+                store.ingest_run_bundle(bundle)
 
     def test_decision_can_target_artifact_or_claim_without_changing_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

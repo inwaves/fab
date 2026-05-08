@@ -48,14 +48,14 @@ packet.
 Each workstream should emit enough structure for later agents and humans to
 understand what happened:
 
-- claims and uncertainty;
-- evidence pointers;
-- code, configs, scripts, notebooks, and patches;
-- datasets, prompts, evals, model identifiers, and run logs;
-- failed attempts and dead ends;
-- surprising observations;
-- reproduction notes;
-- suggested follow-up.
+- a short summary;
+- claims;
+- evidence;
+- code when code produced the result;
+- results and logs;
+- limitations;
+- suggested follow-up;
+- references the agent actually used.
 
 A prose report alone is not enough. The artefact package is the research output.
 
@@ -65,7 +65,7 @@ The execution boundary is:
 
 ```text
 agent / execution platform
--> run bundle in local storage, object storage, or an inbox
+-> run bundle in Alexandria or another inbox
 -> Fab ingest adapter
 -> state packet and live-state update
 ```
@@ -73,11 +73,13 @@ agent / execution platform
 The Maestro branch proved the loop by letting an agent clone Fab and call
 `fab packet` directly. That is a useful test path, but not the intended
 architecture. In production, agents should write a Fab-compatible manifest and
-artifact files or URIs somewhere durable. Fab should watch or ingest those
-completed bundles.
+one artifact bundle somewhere durable. For the MVP, that durable substrate is
+the public `inwaves/Alexandria` repo. Fab should watch or ingest completed
+bundles from there.
 
-The first implementation should be an explicit command such as
-`fab ingest-run --from <bundle>`. A later watcher can poll an object-store inbox,
+The current implementation is an explicit command:
+`fab ingest-run --from <bundle>`. A later watcher can monitor Alexandria
+commits, object-store inboxes, shared directories, or execution-platform APIs,
 but it should reuse the same validation path. See
 [Remote execution and ingest](remote-ingest.md).
 
@@ -120,13 +122,18 @@ work may already be gone.
 ## Knowledge Substrate
 
 Fab needs access to prior knowledge: previous experiments, artefacts, code,
-human judgments, papers, and research notes. The local `inwaves/kb` repo is a
-useful example of the kind of substrate Fab may need to interoperate with, but
-Fab is not itself a general-purpose knowledge base.
+human judgments, papers, and research notes. The public MVP substrate is
+`inwaves/Alexandria`: raw agent artifacts, Fab-transformed findings, and human
+notes can coexist there. The
+contract remains natural-language first. Fab resolves explicit references when
+they are present, records resolution snapshots, records what references an agent
+actually used, and leaves write-back under human judgment.
 
 Agents should build on prior findings without becoming librarians. They should
-use prior context, produce artefact packages, and propose updates. Humans decide
-what enters durable understanding.
+use prior context and produce artefact packages. Humans decide what enters
+durable understanding.
+
+See [Knowledge substrate interface](knowledge-substrate.md).
 
 ## Graphs
 

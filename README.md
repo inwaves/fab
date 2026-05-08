@@ -31,7 +31,7 @@ Fab can own the research protocol without owning the execution platform:
 
 - which contract a workstream is answering;
 - what agents must emit while working;
-- how artefacts, claims, evidence, code, failures, and provenance are packaged;
+- how artefacts, claims, evidence, code, limitations, and used references are packaged;
 - how outputs are summarized for human review;
 - how completed remote-agent bundles are ingested;
 - how human attention is allocated;
@@ -45,19 +45,19 @@ The implemented pieces are still modest:
   ephemeral; the research is not.
 - **State packets**: append-only updates emitted by external agents or humans.
 - **Live state**: the latest known hypothesis, result, blocker, intended next
-  step, flag, and rationale.
-- **Remote ingest boundary**: design target for accepting completed run bundles
-  from execution systems without requiring agents to clone Fab.
-- **Artefact packages**: structured references to reports, logs, plots, code,
-  configs, datasets, prompts, models, evals, claims, evidence, failures,
-  uncertainty, reproduction notes, and follow-up.
+  step, and rationale.
+- **Remote ingest boundary**: `ingest-run` accepts completed local bundles from
+  execution systems without requiring agents to clone Fab; Alexandria commit
+  monitoring is the next step.
+- **Artefact packages**: one bundle per run containing the report, code,
+  results, logs, claims, evidence, limitations, and suggested follow-up.
 - **Brief**: a compact human-facing view over workstreams, attention reasons,
   artifacts, claims, judgments, and context that is safe or unsafe to carry
   forward.
 - **Human judgments**: append-only rationale records that can target a
   workstream, artifact, or claim.
 - **Attention queue**: a mechanical list of workstreams that look blocked,
-  flagged, deviated, stale, unscoped, or due for human attention.
+  stale, limited, unscoped, or due for human attention.
 - **Pilot fixture**: a simulated batch of black-box agent outputs for testing
   the human inspection workflow.
 
@@ -67,10 +67,13 @@ the protocol objects are useful enough before building a larger system.
 ## Knowledge And Graphs
 
 Fab needs access to prior knowledge: previous experiments, results, artefacts,
-code, human judgments, and research notes. A knowledge base shaped like
-`inwaves/kb` is a useful local example, but Fab is not a general-purpose KB and
-does not end at writing notes. The point is to help a researcher consolidate
-their view from agent work without turning agents into librarians.
+code, human judgments, and research notes. `inwaves/Alexandria` is the public
+MVP substrate: agents can commit artifact bundles there, humans can keep notes
+there, and Fab can read from it or later write transformed findings back to it.
+Alexandria has the same practical qualities we want from the research substrate,
+but is the public boundary for Fab. Contracts remain natural-language first. The
+point is to help a researcher consolidate their view from agent work without
+turning agents into librarians.
 
 Graph structure is useful, but it is not the atomic unit of Fab. Lineage,
 dependency, contradiction, replication, critique, and follow-up all naturally
@@ -89,7 +92,7 @@ Fab is not currently:
 - an inference harness;
 - a dashboard for steering individual agents;
 - a paper queue;
-- a consolidated institutional knowledge base.
+- a consolidated institutional knowledge substrate.
 
 Execution stays external. Consolidation and promotion are deferred until the
 basic protocol loop is useful.
@@ -97,8 +100,8 @@ basic protocol loop is useful.
 Agents do not need Fab itself. In the intended remote-execution design, an
 agent receives a contract, workstream context, an execution platform, and an
 output manifest schema. It writes a completed run bundle to a local or
-object-store inbox. Fab ingests that bundle and records packet metadata,
-artifact pointers, claims, evidence, provenance, and uncertainty.
+Alexandria-backed inbox. Fab ingests that bundle and records packet metadata,
+artifact bundle pointers, claims, evidence, limitations, and used references.
 
 ## Quick Start
 
@@ -138,7 +141,8 @@ uv run fab show ws_001
 uv run fab show ws_001 --brief
 uv run fab attach-contract ws_001 --contract-id contract_001 --version 1
 uv run fab packet ws_001 --source agent-a --changed "..." --next "..." --rationale "..."
-uv run fab packet ws_001 --source agent-a --artifact-json '{"kind":"report","path":"runs/ws_001/baseline-report.md"}'
+uv run fab packet ws_001 --source agent-a --artifact runs/ws_001/baseline-report.md
+uv run fab ingest-run --from ../alexandria/artifacts/program/ws_001/run-abc123
 uv run fab judge ws_001 --action replicate --rationale "..."
 uv run fab judge ws_001 --target-type claim --target-id art_001/claim_001 --action needs-replication --rationale "..."
 uv run fab judge ws_001 --action escalate --rationale "..." --next-attention-due-at 2026-05-10
@@ -155,11 +159,12 @@ uv run fab link ws_001 ws_002 --relationship related
 - [Research contracts](docs/contracts.md)
 - [Research protocol](docs/research-protocol.md)
 - [Remote execution and ingest](docs/remote-ingest.md)
+- [Knowledge substrate interface](docs/knowledge-substrate.md)
 - [Brief and human judgment](docs/brief-and-judgment.md)
-- [Artefact and provenance pointers](docs/artifacts.md)
+- [Artefact packages](docs/artifacts.md)
 - [Pilot fixture](docs/pilot-fixture.md)
 - [Strategic context](docs/research/strategic-context.md)
-- [KB source map](docs/research/kb-source-map.md)
+- [Alexandria source map](docs/research/alexandria-source-map.md)
 
 ## Test
 
@@ -169,6 +174,6 @@ uv run python -m unittest discover -s tests
 
 ## Next Build
 
-The next build target is to add the ingest boundary: `fab ingest-run --from
-<bundle>` for completed agent run bundles, followed by better comparison inside
-the brief and a clearer way to turn judgments into the next contract/context.
+The next build target is to connect the ingest boundary to Alexandria commits,
+then improve comparison inside the brief and the bridge from judgments into the
+next contract/context.

@@ -11,16 +11,22 @@ but it is not the intended boundary for real execution.
 External agents need the contract, their execution environment, and the output
 protocol. They do not need the Fab repo or write access to the Fab store.
 
+For the MVP, the concrete substrate is the public `inwaves/Alexandria` repo. An
+agent can write a completed run bundle into Alexandria, commit it, and push. Fab
+then watches commits or is invoked manually against a bundle path. The local
+`ingest-run` command is the inner validation path that the watcher will call.
+
 The intended shape is:
 
 ```text
 contract + context
 -> external execution platform
--> agent run bundle
+-> Alexandria commit containing an agent run bundle
 -> Fab ingest adapter
 -> Fab registry
 -> brief
 -> human judgment
+-> optional Alexandria write-back
 ```
 
 An execution platform such as Podium owns execution, sandboxing, tool access,
@@ -29,28 +35,43 @@ briefing, and human judgment.
 
 ## Run Bundle
 
-A completed run should be emitted as a bundle in a local directory, object-store
-prefix, or other inbox:
+A completed run should be emitted as a bundle in Alexandria, a local directory,
+object-store prefix, or another inbox. The Alexandria MVP can use:
 
 ```text
-<inbox>/<program>/<workstream_id>/<run_id>/
+artifacts/<program>/<workstream_id>/<run_id>/
   manifest.json
-  artifacts/
+  artifact/
     report.md
-    results.json
-    plot.png
-    script.py
-  logs/
-    stdout.txt
-    tool-calls.jsonl
+    code/
+    results/
+    logs/
   READY
+```
+
+The artifact is the bundle. Code, results, logs, plots, and prose all belong
+inside that bundle when they exist. Fab should not require separate artifact
+types such as `code` or `plot`.
+
+Example:
+
+```text
+artifact/
+    report.md
+    code/
+      analysis.py
+    results/
+      cluster-audit.json
+      tradeoff.png
+    logs/
+      stdout.txt
+      tool-calls.jsonl
 ```
 
 The `READY` marker means the bundle is complete and safe to ingest. Without
 that marker, Fab should assume the run may still be writing files.
 
-The manifest is the packet-level contract between the execution platform and
-Fab:
+The manifest is the minimal contract between the execution platform and Fab:
 
 ```json
 {
@@ -60,52 +81,55 @@ Fab:
     "version": 1
   },
   "source": "podium/remote-agent-maestro/run-abc123",
-  "tried": "...",
-  "result": "...",
-  "failed": "...",
-  "next_action": "...",
-  "rationale": "...",
-  "blockers": [],
-  "deviations": [],
-  "flags": ["..."],
-  "artifacts": [
+
+  "summary": "Audited the baseline cluster claim. Current evidence supports seeded decoding-stability only; broader stability is untested.",
+  "status": "completed_with_limitations",
+
+  "claims": [
+    "The baseline cluster evidence currently supports decoding-RNG stability only."
+  ],
+
+  "evidence": [
     {
-      "id": "art_external_001",
-      "kind": "report",
-      "uri": "s3://fab-inbox/program/ws_001/run-abc123/artifacts/report.md",
-      "description": "...",
-      "claims": [],
-      "evidence": [],
-      "failed_attempts": [],
-      "uncertainty": "...",
-      "reproduction": {
-        "commands": [],
-        "environment": [],
-        "notes": null
-      },
-      "suggested_follow_up": [],
-      "provenance": {
-        "code": [],
-        "configs": [],
-        "datasets": [],
-        "models": [],
-        "prompts": [],
-        "evals": [],
-        "logs": [],
-        "outputs": []
-      }
+      "summary": "The prior Fab artifact only recorded stability across three seeded eval passes.",
+      "path": "artifact/report.md"
     }
+  ],
+
+  "limitations": [
+    "Original dataset and model artifacts were not available, so the original scan was not rerun."
+  ],
+
+  "next": [
+    "Run paraphrase-perturbation stability.",
+    "Record the embedding model used for clustering."
+  ],
+
+  "used_refs": [
+    "fab://ws_001/art_001",
+    "alexandria://papers/a3-an-automated-alignment-agent-for-safety-finetun.md"
   ]
 }
 ```
 
-For the current file-backed MVP, artifact `uri` may be a local path, object-store
-URI, or stable content-addressed reference. Fab should record pointers and
-metadata; it should not assume artifacts live inside the Fab framework repo.
+Allowed `status` values for the MVP:
+
+- `completed`
+- `completed_with_limitations`
+- `failed`
+
+If a run needs attention, the agent writes the reason in `limitations`. Fab can
+mechanically surface any non-empty `limitations` list for human review. The MVP
+manifest has no separate attention field.
+
+Paths in `manifest.json` are relative to the run-bundle root. For Alexandria,
+Fab records the bundle root path and the commit it ingested from. For other
+stores, Fab can record the bundle root URI plus relative paths; it does not need
+every file to carry its own full URI.
 
 ## Ingest Adapter
 
-The first implementation should be explicit:
+The current implementation is explicit:
 
 ```bash
 uv run fab ingest-run --from /path/to/run-bundle
@@ -117,19 +141,29 @@ That command should:
 - parse and validate `manifest.json`;
 - check that the workstream exists;
 - check that the manifest contract matches the workstream contract;
-- normalize artifact pointers;
+- record the artifact bundle root;
 - append a state packet;
 - update live state;
-- record ingest status and errors.
+- record ingest status.
 
-The later implementation can watch an inbox:
+The next implementation should watch Alexandria commits:
 
 ```bash
-uv run fab watch-inbox s3://fab-inbox/
+uv run fab watch-alexandria /path/to/alexandria
 ```
 
 The watcher should be a convenience over the same validation path, not a second
-protocol.
+protocol. It should detect newly pushed bundles under `artifacts/`, ignore
+bundles without `READY`, ingest each completed bundle once, and surface errors
+without rewriting agent output.
+
+## Alexandria Write-Back
+
+Alexandria is also the durable knowledge substrate. Fab may later write
+transformed findings, attention notes, or human-approved updates back to
+Alexandria. The incoming artifact bundle should remain intact. Write-back should
+land somewhere separate from raw agent artifacts so the substrate does not blur
+agent output, Fab transformation, and human judgment.
 
 ## Non-Goals
 
@@ -140,15 +174,13 @@ Remote ingest is not:
 - a sandbox;
 - a compute allocator;
 - a replacement for Podium or another execution platform;
-- a durable knowledge-base promotion layer.
+- the only writer to Alexandria.
 
 Fab receives completed research output. It does not manage the agent lifecycle.
 
 ## Open Questions
 
 - Should Fab copy small artifacts into a managed store, or always record URIs?
-- What is the minimum manifest schema needed before agents can use this without
-  cloning Fab?
 - How should duplicate bundles be detected: run id, content hash, packet id, or
   all three?
 - Where should ingest errors live so a failed bundle can be repaired without

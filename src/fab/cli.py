@@ -91,6 +91,7 @@ def print_review_detail(data: dict[str, Any]) -> None:
     print_list("results", live_state.get("results", []))
     print_list("failed attempts", live_state.get("failed_attempts", []))
     print_list("blockers", live_state.get("blockers", []))
+    print_list("limitations", live_state.get("limitations", []))
     print_list("deviations", live_state.get("deviations", []))
     print_list("flags", live_state.get("flags", []))
     print_artifacts_detail(live_state.get("artifacts", []))
@@ -161,6 +162,8 @@ def print_brief(data: dict[str, Any]) -> None:
             )
             if item.get("results"):
                 print(f"  result: {item['results'][-1]}")
+            if item.get("limitations"):
+                print(f"  limitation: {item['limitations'][-1]}")
             if item.get("next_intended_action"):
                 print(f"  next: {item['next_intended_action']}")
     else:
@@ -229,6 +232,10 @@ def print_artifacts_detail(artifacts: list[dict[str, Any]]) -> None:
         )
         if artifact.get("uncertainty"):
             print(f"  uncertainty: {artifact['uncertainty']}")
+        if artifact.get("limitations"):
+            print(f"  limitations: {'; '.join(artifact['limitations'])}")
+        if artifact.get("used_refs"):
+            print(f"  used refs: {', '.join(artifact['used_refs'])}")
         claims = artifact.get("claims", [])
         if claims:
             print("  claims:")
@@ -361,6 +368,10 @@ def build_parser() -> argparse.ArgumentParser:
     packet.add_argument("--artifact", action="append")
     packet.add_argument("--artifact-json", action="append")
     packet.add_argument("--json", action="store_true")
+
+    ingest = sub.add_parser("ingest-run", help="ingest a completed remote run bundle")
+    ingest.add_argument("--from", dest="bundle_path", required=True)
+    ingest.add_argument("--json", action="store_true")
 
     judge = sub.add_parser("judge", help="record a human judgment")
     judge.add_argument("workstream_id")
@@ -512,6 +523,14 @@ def main(argv: list[str] | None = None) -> int:
                 artifact_ref=artifact_refs,
             )
             print_json(result) if args.json else print(f"Added {result['id']} to {args.workstream_id}")
+            return 0
+
+        if args.command == "ingest-run":
+            result = store.ingest_run_bundle(args.bundle_path)
+            if args.json:
+                print_json(result)
+            else:
+                print(f"Ingested {result['id']} from {args.bundle_path}")
             return 0
 
         if args.command == "judge":

@@ -44,7 +44,8 @@ Examples:
 
 - short research memo
 - reproducible experiment
-- artefact package with code, configs, logs, data pointers, and provenance
+- artefact bundle with report, code, results, logs, claims, evidence, and
+  limitations
 - ranked list of candidate methods
 - critique of whether this direction is worth running
 - implementation patch
@@ -67,7 +68,7 @@ Use this only for things the human already knows should trigger attention, such 
 
 Optional links or notes:
 
-- relevant KB notes
+- relevant Alexandria notes
 - papers
 - prior artefact packages
 - prior human judgments

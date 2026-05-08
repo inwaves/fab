@@ -2,7 +2,7 @@
 
 ## Status Checklist
 
-Last updated: 2026-05-07.
+Last updated: 2026-05-08.
 
 Legend: `[x] done`, `[~] in progress`, `[ ] not started`.
 
@@ -19,19 +19,20 @@ Legend: `[x] done`, `[~] in progress`, `[ ] not started`.
   multi-workstream alignment programme.
 - [x] Research Protocol MVP skeleton: make the current local skeleton express
   `contract -> workstreams -> artefact packages -> brief -> human judgment`.
-- [x] Rich artefact package skeleton: claims, evidence, code, datasets, configs, logs,
-  uncertainty, failures, suggested follow-up, and provenance.
+- [x] Rich artefact package skeleton: claims, evidence, code, results, logs,
+  limitations, suggested follow-up, and used references.
 - [x] Brief skeleton: produce a concise batch view with attention reasons,
   artifacts, claims, judgments, and next-context buckets.
 - [x] Human judgment record: capture what the researcher trusts, rejects, wants
   replicated, escalates, prevents from propagating, or feeds into a revised
   contract, with targets on workstreams, artifacts, and claims.
-- [ ] Remote execution ingest boundary: accept completed run bundles from an
-  external execution platform without requiring agents to clone Fab.
+- [~] Remote execution ingest boundary: `ingest-run` accepts completed local
+  bundles; Alexandria commit monitoring is not started.
 - [ ] Batch comparison: surface convergence, contradictions, shared assumptions,
   eval shortcuts, gaps, and replication needs.
 - [ ] Knowledge substrate interface: allow contracts and workstreams to reference
-  prior knowledge and artefacts without turning Fab into a generic KB.
+  prior knowledge and artefacts through adapters without turning Fab into a
+  generic knowledge substrate.
 
 Deferred:
 
@@ -42,8 +43,8 @@ Deferred:
   and dependency analysis across many programmes.
 - [ ] UI/dashboard: only after the protocol loop is valuable in local form.
 
-Current focus: make the MVP loop genuinely useful, especially comparison in the
-brief and loop closure into the next context or contract.
+Current focus: connect the local ingest primitive to the Alexandria substrate,
+then make the brief useful for comparison and loop closure.
 
 ## Product Target
 
@@ -80,12 +81,11 @@ The repo contains a local, file-backed skeleton:
   reasons, and next-context buckets;
 - a simulated pilot fixture.
 
-The current code exposes `attention`, `brief`, `show --brief`, and `judge`
-commands. They are still local skeletons for the protocol objects.
+The current code exposes `attention`, `brief`, `show --brief`, `judge`, and
+`ingest-run` commands. They are still local skeletons for the protocol objects.
 
-The current code can register packets only through local CLI calls. The next
-boundary is an ingest adapter so agents can emit completed bundles to a local or
-object-store inbox while Fab remains the receiving ledger.
+The current code can ingest one completed local run bundle. The next boundary is
+watching Alexandria commits so agents can publish bundles without cloning Fab.
 
 ## Build Sequence
 
@@ -133,13 +133,10 @@ The package should include:
 
 - claims;
 - evidence;
-- code, configs, scripts, notebooks, and patches;
-- datasets, prompts, evals, model identifiers, and run logs;
-- failed attempts;
-- uncertainty;
-- reproduction notes;
-- suggested follow-up;
-- provenance.
+- code when code produced the result;
+- results and logs;
+- limitations;
+- suggested follow-up.
 
 This is where agent work becomes durable.
 
@@ -176,21 +173,23 @@ primarily a command to a specific agent.
 
 ### 4. Remote Execution Ingest
 
-Status: design only.
+Status: local ingest primitive present; Alexandria watcher not started.
 
 The Maestro branch proved that an external agent can produce useful Fab-shaped
-work: packets, claims, evidence, uncertainty, provenance, and artifacts. It did
+work: claims, evidence, limitations, follow-up, and an artifact bundle. It did
 so by cloning Fab and calling `fab packet` directly. That should remain a test
 shortcut, not the production boundary.
 
-The intended boundary is:
+For the MVP, the intended boundary is:
 
 ```text
 contract + context
 -> Podium or another execution platform
--> completed run bundle
+-> Alexandria commit containing a completed run bundle
 -> Fab ingest adapter
 -> Fab registry
+-> brief / attention
+-> optional Alexandria write-back
 ```
 
 The agent should not need the Fab repo. It should receive:
@@ -202,22 +201,23 @@ The agent should not need the Fab repo. It should receive:
 
 It should return:
 
-- `manifest.json` with packet fields;
-- artifact files or artifact URIs;
-- logs and provenance;
+- `manifest.json` with summary, status, claims, evidence, limitations, next
+  steps, and used references;
+- one artifact bundle containing report, code, results, and logs when present;
 - a completion marker such as `READY`.
 
-Initial build target:
+Implemented:
 
 - `fab ingest-run --from <bundle>` for local bundle paths.
 
-Later build target:
+Next build target:
 
-- `fab watch-inbox <uri>` for object-store or shared-directory inboxes.
+- `fab watch-alexandria <repo>` for new bundles committed under
+  `artifacts/<program>/<workstream_id>/<run_id>/`.
 
 The watcher should reuse the same validation path as manual ingest. Fab should
-record artifact pointers and metadata; it should not assume research artifacts
-live inside the Fab framework repo.
+record the artifact bundle root and manifest metadata; it should not assume
+research artifacts live inside the Fab framework repo.
 
 ### 5. Batch Comparison
 
@@ -243,13 +243,33 @@ programme-shape component.
 Status: design only.
 
 Fab needs access to prior knowledge: previous experiments, artefacts, code,
-human judgments, papers, and research notes. The local `inwaves/kb` repo is a
-useful design reference, but Fab should not assume that all future deployments
-look like that repo.
+human judgments, papers, and research notes. Alexandria is the public MVP
+substrate for that exchange.
 
 The interface should let contracts and workstreams reference prior knowledge,
-and let agent outputs propose updates, while leaving durable understanding under
-human judgment.
+while leaving write-back and durable understanding under human judgment.
+
+Fab should define source adapters and lightweight resolution records, not a
+heavy ontology over Alexandria. Public Fab can assume Alexandria for the MVP
+without making Alexandria's folder conventions the permanent product boundary.
+
+The MVP should keep research contracts natural-language first. If a researcher
+cares about exact context, they should put an exact URI or path in the contract.
+Fab should resolve explicit references, record what version was used, and later
+compare that with the references an agent says it used.
+
+Initial build target:
+
+- source registry with aliases such as `alexandria://`, `fab://`, and `s3://`;
+- resolution snapshots for explicit references in contracts and workstreams;
+- `refs check` for unresolved, dirty, unpinned, or unsafe explicit references;
+- `context show` for the contract plus resolved explicit references;
+- ingest support for `used_refs`;
+- brief surface for missing, stale, unresolved, or unreviewed references.
+
+Later build target:
+
+- adapter-driven export of human-approved Alexandria updates.
 
 ## Design Warnings
 
@@ -263,12 +283,12 @@ human judgment.
 
 ## Immediate Next Actions
 
-1. Add `fab ingest-run --from <bundle>` for completed local run bundles with a
-   manifest, artifacts, logs, and a `READY` marker.
+1. Add `fab watch-alexandria <repo>` over the same validation path as
+   `ingest-run`.
 2. Improve comparison inside `fab brief`: convergence, contradictions, shared
    assumptions, repeated failures, shortcut risk, and replication needs.
 3. Turn `next_context` into a clearer bridge from judgments to the next contract
    or context package.
-4. Add a thin prior-knowledge/reference interface, using `inwaves/kb` as an
-   example but not as the product boundary.
+4. Add a thin prior-knowledge/reference interface with Alexandria as the public
+   adapter target.
 5. Leave workstream fan-out/programme shape as a later design problem.

@@ -1,7 +1,7 @@
 # Strategic Context
 
 This is the minimum project context needed to build Fab without reopening the
-whole KB.
+whole Alexandria-backed research substrate.
 
 ## Why Fab Exists
 
@@ -37,20 +37,22 @@ Fab does not own the agent platform. It owns the research interface:
 - how human judgment feeds the next contract, batch, or programme state.
 
 The agent does not need the Fab repo. The execution platform gives it contract
-context and tools; the agent emits a run bundle with a manifest, artifacts,
-logs, provenance, claims, evidence, failures, and uncertainty. Fab validates and
-registers that bundle.
+context and tools; the agent emits a run bundle with a simple manifest and one
+artifact bundle containing the report, code, results, logs, claims, evidence,
+limitations, and suggested follow-up. For the MVP, that bundle lands in
+`inwaves/Alexandria`; Fab validates and registers it.
 
 ## Knowledge Substrate
 
 Agents need access to prior experiments, results, artefacts, code, and human
-judgments. A knowledge base shaped like `inwaves/kb` is a useful local example,
-but Fab should not assume that all deployments use that exact structure.
+judgments. `inwaves/Alexandria` is the public MVP substrate for that exchange.
+Fab should expose source adapters and reference semantics that can work with
+Alexandria now and other substrates later.
 
 The important distinction is:
 
 - prior knowledge informs contracts and workstreams;
-- agent work produces artefact packages and proposed updates;
+- agent work produces artefact packages and suggested updates;
 - humans decide what changes durable understanding.
 
 Agents should not become librarians. The system should help humans consolidate
@@ -80,9 +82,10 @@ judgments. Graphs are views over their relationships.
   attention.
 - Local results can become shared assumptions before their scope is understood.
 
-## Local KB Anchors
+## Alexandria Anchors
 
-Use `inwaves/kb` as grounding context when useful:
+Use Alexandria as grounding context when useful. These paths are design anchors
+for this workspace, not permanent Fab dependencies:
 
 - `research/alignment-via-ai-assistance.md`
 - `research/mitigations-to-automated-alignment/README.md`

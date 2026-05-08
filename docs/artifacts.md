@@ -1,14 +1,13 @@
-# Artefact Packages And Provenance
+# Artefact Packages
 
 Artefacts are the durable outputs of ephemeral agent work. A prose report is not
 enough. Later agents and humans may need the code, configs, prompts, evals,
-datasets, logs, plots, failed attempts, and reproduction notes that made the
-result possible.
+datasets, logs, plots, and notes that made the result possible.
 
-The current code implements a small artefact package shape inside state packets
-and live state. It is still file-backed and local, but it now captures the parts
-needed for the MVP loop: claims, evidence, provenance, uncertainty,
-reproduction notes, failures, and follow-up.
+The MVP remote-output shape is a single artefact bundle per run. The bundle
+contains the report, code, results, logs, and any other files the agent produced.
+Its `manifest.json` says what the bundle claims, what supports those claims,
+what limited the run, and what should happen next.
 
 For remote execution, artifact contents should usually live outside the Fab
 framework repo: in an execution-platform artifact store, a shared filesystem, an
@@ -22,119 +21,86 @@ Fab should make agent research cumulative. That requires more than summaries:
 - What claim does this artefact support?
 - What run produced it?
 - Which code, dataset, prompt, model, eval, or scaffold was involved?
-- What failed before this result appeared?
+- What limited the run or result?
 - What would be needed to reproduce it?
 - Was it produced independently of related workstreams?
 - Is it local evidence, or can later work safely build on it?
 
-The artefact package is the research output. It is the thing a later contract or
-workstream can reference.
+The artefact package is the research output. It is the thing a later contract,
+workstream, or human judgment can reference.
 
-## Current Package Shape
+## Remote Bundle Shape
+
+```text
+run/
+  manifest.json
+  artifact/
+    report.md
+    code/
+    results/
+    logs/
+  READY
+```
+
+`manifest.json`:
 
 ```json
 {
-  "id": "art_001",
-  "kind": "report",
-  "path": "runs/ws_001/baseline-report.md",
-  "description": "Baseline eval summary",
-  "produced_by": "agent-a",
-  "created_at": "2026-05-07T10:00:00Z",
+  "workstream_id": "ws_001",
+  "contract": {
+    "id": "contract_pilot_a3_false_positive",
+    "version": 1
+  },
+  "source": "podium/run-abc123",
+  "summary": "Audited the baseline cluster claim. Current evidence supports seeded decoding-stability only; broader stability is untested.",
+  "status": "completed_with_limitations",
   "claims": [
-    {
-      "id": "claim_cluster",
-      "text": "A baseline cluster is stable enough to inspect.",
-      "confidence": "medium",
-      "evidence": ["ev_stability"],
-      "caveats": ["human labels are missing"]
-    }
+    "The baseline cluster evidence currently supports decoding-RNG stability only."
   ],
   "evidence": [
     {
-      "id": "ev_stability",
-      "kind": "metric",
-      "summary": "Cluster assignments are stable across seeded runs.",
-      "path": "runs/ws_001/stability.json",
-      "refs": []
+      "summary": "The prior Fab artifact only recorded stability across three seeded eval passes.",
+      "path": "artifact/report.md"
     }
   ],
-  "failed_attempts": ["unseeded run was too noisy"],
-  "uncertainty": "not yet validated",
-  "reproduction": {
-    "commands": ["uv run python src/evals/refusal_eval.py"],
-    "environment": ["python 3.12"],
-    "notes": "uses a fixed seed"
-  },
-  "suggested_follow_up": ["human-label nearest neighbors"],
-  "provenance": {
-    "code": ["src/evals/refusal_eval.py"],
-    "configs": ["configs/refusal_eval.toml"],
-    "datasets": ["data/refusal-benign-v1.jsonl"],
-    "models": ["qwen-8b-lora-run-003"],
-    "prompts": ["prompts/refusal-eval-v2.md"],
-    "evals": ["evals/refusal-fp-v1"],
-    "logs": [],
-    "outputs": ["runs/ws_001/baseline-report.md"]
-  },
-  "review": {
-    "local_only": true,
-    "safe_to_reuse": false,
-    "notes": null
-  }
+  "limitations": [
+    "Original dataset and model artifacts were not available, so the original scan was not rerun."
+  ],
+  "next": [
+    "Run paraphrase-perturbation stability.",
+    "Record the embedding model used for clustering."
+  ],
+  "used_refs": [
+    "fab://ws_001/art_001",
+    "alexandria://papers/a3-an-automated-alignment-agent-for-safety-finetun.md"
+  ]
 }
 ```
 
-Defaults:
+Fields:
 
-- `id` is generated if omitted.
-- `kind` defaults to `artifact`.
-- `produced_by` defaults to the packet source.
-- `created_at` defaults to the packet timestamp.
-- `claims`, `evidence`, `failed_attempts`, and `suggested_follow_up` default to
-  empty lists.
-- string claims and evidence are accepted as shorthand and normalized.
-- `reproduction.commands` and `reproduction.environment` default to empty lists.
-- provenance lists default to empty.
-- `review.local_only` defaults to `true`.
-- `review.safe_to_reuse` defaults to `false`.
+- `summary`: short account of what the run found.
+- `status`: `completed`, `completed_with_limitations`, or `failed`.
+- `claims`: specific statements the bundle asks humans or later agents to
+  consider. Agents do not need to assign IDs; Fab can do that on ingest.
+- `evidence`: support for those claims, usually pointing into the artifact
+  folder or prior Fab state.
+- `limitations`: what blocked, weakened, or scoped the result.
+- `next`: suggested next research steps.
+- `used_refs`: prior context the agent actually used.
 
-## Later Package Shape
+If the run needs attention, put the reason in `limitations`. The MVP manifest
+has no separate attention field.
 
-The current package is deliberately simple. Later this may become a directory,
-manifest, database record, external object, or a richer bundle with patches,
-notebooks, checkpoints, tables, plots, and generated data. Fab should care about
-the protocol shape, not one storage backend.
+## Local CLI Compatibility
 
-Remote-ingest manifests should be allowed to use stable artifact URIs, for
-example `s3://...`, `gs://...`, `https://...`, or content-addressed references.
-The current CLI uses `path`; the ingest boundary should normalize either local
-paths or remote URIs into the registry's artifact pointer shape.
-
-## CLI
-
-For a simple path-only artefact:
-
-```bash
-uv run fab packet ws_001 \
-  --source agent-a \
-  --artifact runs/ws_001/baseline-report.md
-```
-
-For a structured artefact package:
-
-```bash
-uv run fab packet ws_001 \
-  --source agent-a \
-  --artifact-json '{"kind":"report","path":"runs/ws_001/baseline-report.md","description":"Baseline eval summary","claims":[{"id":"claim_cluster","text":"A baseline cluster is stable enough to inspect.","confidence":"medium","evidence":["ev_stability"],"caveats":["human labels are missing"]}],"evidence":[{"id":"ev_stability","kind":"metric","summary":"Cluster assignments are stable across seeded runs.","path":"runs/ws_001/stability.json"}],"reproduction":{"commands":["uv run python src/evals/refusal_eval.py"],"environment":["python 3.12"]},"provenance":{"code":["src/evals/refusal_eval.py"],"configs":["configs/refusal_eval.toml"],"datasets":["data/refusal-benign-v1.jsonl"],"models":["qwen-8b-lora-run-003"],"prompts":["prompts/refusal-eval-v2.md"],"evals":["evals/refusal-fp-v1"],"outputs":["runs/ws_001/baseline-report.md"]}}'
-```
-
-Multiple `--artifact` and `--artifact-json` flags can be used in one packet.
+The existing local `fab packet` command can still register path references for
+the file-backed skeleton. The remote execution contract is the bundle shape
+above. `fab ingest-run` maps that bundle into Fab's internal packet/live-state
+records.
 
 ## Reuse Semantics
 
-Artefacts are local by default. Producing a report, plot, or code patch does not
-mean later workstreams should depend on it.
-
-Changing `safe_to_reuse` should require human judgment and a scope note. For
-the MVP, use `judge --target-type artifact` or `judge --target-type claim` to
-record that judgment. Full promotion is a later layer.
+Artefacts are local by default. Producing a bundle does not mean later
+workstreams should depend on it. Reuse should come from human judgment, not from
+an agent-declared manifest field. Full promotion is a later layer.

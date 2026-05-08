@@ -57,9 +57,9 @@ judgment records.
 
 ## Context
 
-- KB: `papers/a3-an-automated-alignment-agent-for-safety-finetun.md`
-- KB: `papers/automated-weak-to-strong-researcher.md`
-- KB: `papers/the-last-human-written-paper-agent-native-research-artifacts.md`
+- Alexandria: `papers/a3-an-automated-alignment-agent-for-safety-finetun.md`
+- Alexandria: `papers/automated-weak-to-strong-researcher.md`
+- Alexandria: `papers/the-last-human-written-paper-agent-native-research-artifacts.md`
 """
 
 
