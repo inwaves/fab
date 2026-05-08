@@ -13,8 +13,9 @@ protocol. They do not need the Fab repo or write access to the Fab store.
 
 For the MVP, the concrete substrate is the public `inwaves/Alexandria` repo. An
 agent can write a completed run bundle into Alexandria, commit it, and push. Fab
-then watches commits or is invoked manually against a bundle path. The local
-`ingest-run` command is the inner validation path that the watcher will call.
+then an ingester service watches commits or Fab is invoked manually against a
+bundle path. The local `ingest-run` command is the inner validation path that
+the ingester service will call.
 
 The intended shape is:
 
@@ -22,7 +23,8 @@ The intended shape is:
 contract + context
 -> external execution platform
 -> Alexandria commit containing an agent run bundle
--> Fab ingest adapter
+-> Alexandria ingester service
+-> Fab ingest boundary
 -> Fab registry
 -> brief
 -> human judgment
@@ -127,7 +129,7 @@ Fab records the bundle root path and the commit it ingested from. For other
 stores, Fab can record the bundle root URI plus relative paths; it does not need
 every file to carry its own full URI.
 
-## Ingest Adapter
+## Fab Ingest Boundary
 
 The current implementation is explicit:
 
@@ -146,16 +148,54 @@ That command should:
 - update live state;
 - record ingest status.
 
-The next implementation should watch Alexandria commits:
+Fab should keep this boundary small. It is the validation and registration
+primitive, not the long-running process that watches a repository or object
+store.
 
-```bash
-uv run fab watch-alexandria /path/to/alexandria
+## Alexandria Ingester Service
+
+The next implementation should be a small service around this boundary, not
+necessarily a Fab CLI command. It can live in deployment code or a thin service
+repo and depend on Fab as a package or shell out to `fab ingest-run`.
+
+For the Alexandria MVP, the service should:
+
+- keep a local checkout of Alexandria up to date;
+- scan `artifacts/<program>/<workstream_id>/<run_id>/` for `READY`;
+- ignore incomplete bundles;
+- ingest each completed bundle once;
+- keep an ingest ledger outside the raw agent bundle;
+- record the Alexandria commit, bundle relative path, manifest hash, ingest
+  status, packet id, and any error;
+- surface errors without rewriting agent output.
+
+The loop is deliberately boring:
+
+```text
+fetch Alexandria
+-> find READY bundles under artifacts/
+-> skip bundles already in the ingest ledger
+-> run Fab ingest validation
+-> record packet id or error in the ledger
+-> expose status to the human/operator
 ```
 
-The watcher should be a convenience over the same validation path, not a second
-protocol. It should detect newly pushed bundles under `artifacts/`, ignore
-bundles without `READY`, ingest each completed bundle once, and surface errors
-without rewriting agent output.
+This service is not part of the agent execution lifecycle. It is the bridge
+between a durable artifact inbox and Fab's registry.
+
+## Durable Smoke Fixture
+
+Alexandria contains a persistent fixture at:
+
+```text
+artifacts/safety-finetuning-pilot/ws_001/fab-ingest-smoke-001/
+```
+
+Fab's test suite ingests that fixture into a temporary pilot store when a
+sibling Alexandria checkout is present. Set `FAB_ALEXANDRIA_REPO` to run the
+test against another checkout. The fixture proves the connection from
+Alexandria bundle shape to Fab's ingest boundary; it does not test commit
+watching or exactly-once behavior.
 
 ## Alexandria Write-Back
 

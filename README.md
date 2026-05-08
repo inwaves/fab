@@ -47,8 +47,8 @@ The implemented pieces are still modest:
 - **Live state**: the latest known hypothesis, result, blocker, intended next
   step, and rationale.
 - **Remote ingest boundary**: `ingest-run` accepts completed local bundles from
-  execution systems without requiring agents to clone Fab; Alexandria commit
-  monitoring is the next step.
+  execution systems without requiring agents to clone Fab; a separate
+  Alexandria ingester service is the next step.
 - **Artefact packages**: one bundle per run containing the report, code,
   results, logs, claims, evidence, limitations, and suggested follow-up.
 - **Brief**: a compact human-facing view over workstreams, attention reasons,
@@ -172,8 +172,15 @@ uv run fab link ws_001 ws_002 --relationship related
 uv run python -m unittest discover -s tests
 ```
 
+If the sibling Alexandria checkout is present, the test suite also ingests the
+durable smoke fixture at
+`../alexandria/artifacts/safety-finetuning-pilot/ws_001/fab-ingest-smoke-001/`.
+Set `FAB_ALEXANDRIA_REPO=/path/to/alexandria` to point the integration test at
+another checkout.
+
 ## Next Build
 
-The next build target is to connect the ingest boundary to Alexandria commits,
-then improve comparison inside the brief and the bridge from judgments into the
-next contract/context.
+The next build target is a small Alexandria ingester service that discovers
+committed run bundles and calls the existing `ingest-run` boundary, then
+improve comparison inside the brief and the bridge from judgments into the next
+contract/context.

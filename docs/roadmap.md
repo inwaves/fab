@@ -26,8 +26,9 @@ Legend: `[x] done`, `[~] in progress`, `[ ] not started`.
 - [x] Human judgment record: capture what the researcher trusts, rejects, wants
   replicated, escalates, prevents from propagating, or feeds into a revised
   contract, with targets on workstreams, artifacts, and claims.
-- [~] Remote execution ingest boundary: `ingest-run` accepts completed local
-  bundles; Alexandria commit monitoring is not started.
+- [~] Remote execution ingest boundary: `ingest-run` accepts completed bundles
+  and the Alexandria smoke fixture is covered by an integration test; the
+  separate ingester service is not started.
 - [ ] Batch comparison: surface convergence, contradictions, shared assumptions,
   eval shortcuts, gaps, and replication needs.
 - [ ] Knowledge substrate interface: allow contracts and workstreams to reference
@@ -43,8 +44,9 @@ Deferred:
   and dependency analysis across many programmes.
 - [ ] UI/dashboard: only after the protocol loop is valuable in local form.
 
-Current focus: connect the local ingest primitive to the Alexandria substrate,
-then make the brief useful for comparison and loop closure.
+Current focus: connect the local ingest primitive to the Alexandria substrate
+through a small ingester service, then make the brief useful for comparison and
+loop closure.
 
 ## Product Target
 
@@ -84,8 +86,10 @@ The repo contains a local, file-backed skeleton:
 The current code exposes `attention`, `brief`, `show --brief`, `judge`, and
 `ingest-run` commands. They are still local skeletons for the protocol objects.
 
-The current code can ingest one completed local run bundle. The next boundary is
-watching Alexandria commits so agents can publish bundles without cloning Fab.
+The current code can ingest one completed bundle from disk, including the
+durable Alexandria smoke fixture. The next boundary is a separate ingester
+service that watches Alexandria commits so agents can publish bundles without
+cloning Fab.
 
 ## Build Sequence
 
@@ -173,7 +177,8 @@ primarily a command to a specific agent.
 
 ### 4. Remote Execution Ingest
 
-Status: local ingest primitive present; Alexandria watcher not started.
+Status: local ingest primitive present; Alexandria smoke fixture test present;
+separate ingester service not started.
 
 The Maestro branch proved that an external agent can produce useful Fab-shaped
 work: claims, evidence, limitations, follow-up, and an artifact bundle. It did
@@ -186,7 +191,8 @@ For the MVP, the intended boundary is:
 contract + context
 -> Podium or another execution platform
 -> Alexandria commit containing a completed run bundle
--> Fab ingest adapter
+-> Alexandria ingester service
+-> Fab ingest boundary
 -> Fab registry
 -> brief / attention
 -> optional Alexandria write-back
@@ -209,15 +215,20 @@ It should return:
 Implemented:
 
 - `fab ingest-run --from <bundle>` for local bundle paths.
+- a durable Alexandria smoke fixture under
+  `artifacts/safety-finetuning-pilot/ws_001/fab-ingest-smoke-001/`;
+- an integration test that seeds a temporary Fab pilot store and ingests that
+  fixture through the CLI.
 
 Next build target:
 
-- `fab watch-alexandria <repo>` for new bundles committed under
+- a small Alexandria ingester service for new bundles committed under
   `artifacts/<program>/<workstream_id>/<run_id>/`.
 
-The watcher should reuse the same validation path as manual ingest. Fab should
+The ingester should reuse the same validation path as manual ingest. Fab should
 record the artifact bundle root and manifest metadata; it should not assume
-research artifacts live inside the Fab framework repo.
+research artifacts live inside the Fab framework repo. The service can be a
+deployment concern around Fab rather than a core Fab command.
 
 ### 5. Batch Comparison
 
@@ -283,7 +294,7 @@ Later build target:
 
 ## Immediate Next Actions
 
-1. Add `fab watch-alexandria <repo>` over the same validation path as
+1. Add a small Alexandria ingester service over the same validation path as
    `ingest-run`.
 2. Improve comparison inside `fab brief`: convergence, contradictions, shared
    assumptions, repeated failures, shortcut risk, and replication needs.

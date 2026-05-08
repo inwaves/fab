@@ -74,13 +74,14 @@ The Maestro branch proved the loop by letting an agent clone Fab and call
 `fab packet` directly. That is a useful test path, but not the intended
 architecture. In production, agents should write a Fab-compatible manifest and
 one artifact bundle somewhere durable. For the MVP, that durable substrate is
-the public `inwaves/Alexandria` repo. Fab should watch or ingest completed
-bundles from there.
+the public `inwaves/Alexandria` repo. A small ingester service should watch or
+ingest completed bundles from there and then call Fab's ingest boundary.
 
 The current implementation is an explicit command:
-`fab ingest-run --from <bundle>`. A later watcher can monitor Alexandria
-commits, object-store inboxes, shared directories, or execution-platform APIs,
-but it should reuse the same validation path. See
+`fab ingest-run --from <bundle>`. A later ingester can monitor Alexandria
+commits, object-store inboxes, shared directories, or execution-platform APIs.
+It should reuse the same validation path rather than becoming a second
+protocol. See
 [Remote execution and ingest](remote-ingest.md).
 
 ## Artefact Packages To Brief
