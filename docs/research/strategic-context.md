@@ -81,6 +81,28 @@ judgments. Graphs are views over their relationships.
 - Human judgment can become ceremonial if too many low-quality items demand
   attention.
 - Local results can become shared assumptions before their scope is understood.
+- Aggregation can fail even when local outputs look reasonable: many workstreams
+  may share the same weak proxy, assumption, scaffold, dataset, evaluator, or
+  code path, and Fab must avoid turning repeated-but-correlated evidence into
+  confidence.
+
+## Later Design Notes
+
+These are not right-now MVP requirements. The current priority remains
+dogfooding the basic contract, artefact, brief, and judgment loop.
+
+- **Aggregation-level failures:** later consolidation should help identify when
+  research chains keep building on the same weakness. The useful question is not
+  only "is this claim locally supported?" but also "which other claims would
+  fall if this assumption, proxy, scaffold, or eval is wrong?"
+- **Easy-to-evaluate pilots:** early Fab pilots should start with tasks where a
+  researcher can correct mistakes at scale. Decomposition is useful here: steer
+  initial work toward subtasks with clearer evaluation criteria, then gradually
+  move into fuzzier alignment questions.
+- **Red-team corpora:** a future evaluation could deliberately plant a bug,
+  invalid assumption, or weak result in an agent-produced research corpus and
+  test whether Fab's briefs, attention reasons, and judgments surface it to the
+  researcher.
 
 ## Alexandria Anchors
 
