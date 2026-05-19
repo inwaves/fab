@@ -1,0 +1,14 @@
+dist/
+logs/
+state.json
+__pycache__/
+*.pyc
+_extract/
+# Regenerable Fab runtime store (recreated by `orchestrate.py fab-init`/`ingest`).
+# The immutable research contract under store/contracts/ IS tracked.
+store/workstreams/
+store/live-state/
+store/state-packets/
+store/decisions/
+store/ingest-ledger/
+store/sources.json
