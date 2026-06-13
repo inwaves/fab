@@ -51,6 +51,8 @@ The implemented pieces are still modest:
 - **Alexandria ingester service**: a thin service under `services/` scans
   Alexandria for completed bundles, calls Fab's ingest boundary, and records an
   append-only ingest ledger.
+- **Podium shim**: a standalone service shim can prepare a Fab workstream as a
+  Podium-sendable request without making Fab an execution platform.
 - **Artefact packages**: one bundle per run containing the report, code,
   results, logs, claims, evidence, limitations, and suggested follow-up.
 - **Brief**: a compact human-facing view over workstreams, attention reasons,
@@ -148,6 +150,7 @@ uv run fab packet ws_001 --source agent-a --changed "..." --next "..." --rationa
 uv run fab packet ws_001 --source agent-a --artifact runs/ws_001/baseline-report.md
 uv run fab ingest-run --from ../alexandria/artifacts/program/ws_001/run-abc123
 uv run python -m services.alexandria_ingester --alexandria ../alexandria --store .fab
+uv run python -m services.podium_shim prepare --store .fab --workstream-id ws_001 --alexandria ../alexandria --run-id podium-smoke-001 --out /tmp/fab-podium/ws_001
 uv run fab sources add alexandria ../alexandria --uri-prefix alexandria://
 uv run fab refs check --contract-id contract_pilot_a3_false_positive --version 1
 uv run fab judge ws_001 --action replicate --rationale "..."
@@ -167,6 +170,7 @@ uv run fab link ws_001 ws_002 --relationship related
 - [Research protocol](docs/research-protocol.md)
 - [Remote execution and ingest](docs/remote-ingest.md)
 - [Alexandria ingester service](docs/alexandria-ingester.md)
+- [Podium shim](docs/podium-shim.md)
 - [Knowledge substrate interface](docs/knowledge-substrate.md)
 - [Brief and human judgment](docs/brief-and-judgment.md)
 - [Artefact packages](docs/artifacts.md)

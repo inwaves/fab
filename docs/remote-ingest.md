@@ -35,6 +35,57 @@ An execution platform such as Podium owns execution, sandboxing, tool access,
 compute, logs, and artifact storage. Fab owns validation, registration,
 briefing, and human judgment.
 
+## Podium Test Shim
+
+For dogfooding against Podium, Fab has a standalone shim under
+`services.podium_shim`. It is deliberately outside the `fab` CLI surface.
+
+The shim prepares a Podium-sendable message for an existing Podium agent
+instance:
+
+```bash
+uv run python -m services.podium_shim prepare \
+  --store .fab \
+  --workstream-id ws_001 \
+  --alexandria ../alexandria \
+  --run-id podium-smoke-001 \
+  --out /tmp/fab-podium/ws_001
+```
+
+That writes a platform-neutral request, a prompt, and `podium-send.json`. The
+message can be sent with:
+
+```bash
+podium send <instance-id> --json-input /tmp/fab-podium/ws_001/podium-send.json
+```
+
+or by using the shim's thin CLI wrapper around `podium send`.
+
+This is not a Fab execution abstraction. Podium still owns deployment, instances,
+agent lifecycle, sandboxing, logs, and workspace export. Fab only exports the
+workstream context and the expected relative run-bundle path. Completed work
+returns through the same Alexandria ingester described below after the execution
+platform or operator lands the bundle in Alexandria or another durable inbox.
+
+Do not treat a local Alexandria checkout path as visible to a remote agent. The
+Podium shim now sends the relative path, such as
+`artifacts/<program>/<workstream_id>/<run_id>/`, and instructs the agent to write
+there inside its execution workspace unless the platform explicitly provides a
+writable Alexandria checkout or upload target.
+
+### Podium Deployment Pinning
+
+For dogfooding with Podium, behavior changes in the research agent should bump
+the Podium deployment version. Local source inspection shows why: instance
+creation accepts `agent_type:version@hash`, but the coordinator's local
+deployment cache is keyed by `agent_type + version` when deciding whether a
+deployment already exists. The hash suffix is useful for identification, but it
+does not by itself guarantee a coordinator replaces an already-cached version.
+
+The current Fab research-agent smoke target is `fab-research` `0.1.1`: Sonnet
+4.6 remains the model, and Ensemble routing is pinned with
+`target_provider=vertex`.
+
 ## Run Bundle
 
 A completed run should be emitted as a bundle in Alexandria, a local directory,
