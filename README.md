@@ -176,9 +176,24 @@ uv run fab link ws_001 ws_002 --relationship related
 
 ## Test
 
+Install the dev extra (adds pytest) into an editable environment, then run the
+suite with either runner:
+
 ```bash
+uv pip install -e ".[dev]"
+pytest
+```
+
+Or, without a manual install step:
+
+```bash
+uv run --extra dev pytest
 uv run python -m unittest discover -s tests
 ```
+
+The `[tool.pytest.ini_options]` config and the root `conftest.py` put `src/`
+(the `fab` package) and the repo root (the `services` sidecar) on the path, so
+collection works whether or not the project is installed.
 
 If the sibling Alexandria checkout is present, the test suite also ingests the
 durable smoke fixture at
