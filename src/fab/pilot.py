@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from fab.registry import RegistryError, RegistryStore
+from fab.errors import RegistryError
+from fab.store import RegistryStore
 
 
 PILOT_CONTRACT_ID = "contract_pilot_a3_false_positive"
@@ -57,16 +58,16 @@ judgment records.
 
 ## Context
 
-- Alexandria: `papers/a3-an-automated-alignment-agent-for-safety-finetun.md`
-- Alexandria: `papers/automated-weak-to-strong-researcher.md`
-- Alexandria: `papers/the-last-human-written-paper-agent-native-research-artifacts.md`
+- alexandria://papers/a3-an-automated-alignment-agent-for-safety-finetun.md
+- alexandria://papers/automated-weak-to-strong-researcher.md
+- alexandria://papers/the-last-human-written-paper-agent-native-research-artifacts.md
 """
 
 
 def seed_pilot_fixture(store: RegistryStore) -> dict[str, Any]:
     """Seed an empty registry with a simulated black-box-agent pilot."""
     store.init()
-    if store.existing_workstream_ids():
+    if not store.is_empty():
         raise RegistryError("pilot fixture requires an empty registry store")
 
     store.write_contract_version(PILOT_CONTRACT_ID, 1, PILOT_CONTRACT_TEXT)
@@ -352,6 +353,7 @@ def seed_pilot_fixture(store: RegistryStore) -> dict[str, Any]:
     )
 
     return {
+        "store": str(store.root),
         "contract": {"id": PILOT_CONTRACT_ID, "version": 1},
         "program": PILOT_PROGRAM,
         "workstreams": store.list_workstreams(),

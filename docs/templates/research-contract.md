@@ -66,9 +66,13 @@ Use this only for things the human already knows should trigger attention, such 
 
 ## Context
 
-Optional links or notes:
+Optional links or notes. Write anything Fab should be able to resolve as a
+`scheme://` URI, for example `alexandria://papers/<note>.md`; `fab refs check`
+extracts those, resolves them against configured sources, and compares them
+with the `used_refs` agents report. Plain prose mentions are kept for humans
+but are invisible to that check.
 
-- relevant Alexandria notes
+- relevant Alexandria notes, as `alexandria://...` URIs
 - papers
 - prior artefact packages
 - prior human judgments

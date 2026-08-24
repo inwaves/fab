@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 import stat
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from fab.registry import RegistryError, RegistryStore
 
@@ -18,6 +20,30 @@ def write_run_bundle(bundle: Path, manifest: dict, *, ready: bool = True) -> Non
     (bundle / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     if ready:
         (bundle / "READY").touch()
+
+
+def minimal_manifest(**overrides: object) -> dict:
+    manifest = {
+        "workstream_id": "ws_001",
+        "contract": {"id": "contract_001", "version": 1},
+        "source": "podium/run-abc123",
+        "summary": "Audited the baseline cluster claim.",
+        "status": "completed",
+        "claims": [],
+        "evidence": [],
+        "limitations": [],
+        "next": [],
+        "used_refs": [],
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def symlink_or_skip(test: unittest.TestCase, target: Path, link: Path) -> None:
+    try:
+        os.symlink(target, link, target_is_directory=target.is_dir())
+    except (OSError, NotImplementedError) as exc:
+        test.skipTest(f"symlinks not supported here: {exc}")
 
 
 class RegistryStoreTest(unittest.TestCase):
@@ -721,6 +747,193 @@ class RegistryStoreTest(unittest.TestCase):
                 store.get_workstream("ws_001")["timestamps"]["next_review_due_at"],
                 "2099-01-01",
             )
+
+    def test_workstream_ids_must_be_safe_path_segments(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RegistryStore.at(root / "inner" / ".fab")
+            store.init()
+
+            with self.assertRaisesRegex(RegistryError, "invalid workstream id"):
+                store.create_workstream(title="Escape", program="pilot", workstream_id="../../escaped")
+            with self.assertRaisesRegex(RegistryError, "invalid workstream id"):
+                store.get_workstream("../../escaped")
+            with self.assertRaisesRegex(RegistryError, "invalid workstream id"):
+                store.list_packets("../escaped")
+            with self.assertRaisesRegex(RegistryError, "invalid workstream id"):
+                store.list_decisions("ws/001")
+
+            self.assertEqual([path.name for path in root.rglob("*.json")], [])
+
+    def test_create_workstream_validates_next_review_due_at(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = RegistryStore.at(Path(tmp))
+
+            with self.assertRaisesRegex(RegistryError, "invalid datetime"):
+                store.create_workstream(
+                    title="Bad date",
+                    program="pilot",
+                    next_review_due_at="next tuesday",
+                )
+
+            self.assertEqual(store.existing_workstream_ids(), [])
+
+    def test_judgments_follow_lifecycle_transitions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = RegistryStore.at(Path(tmp))
+            store.create_workstream(title="Lifecycle", program="pilot")
+
+            store.add_decision("ws_001", action="continue", rationale="start")
+            repeat = store.add_decision("ws_001", action="continue", rationale="still going")
+            self.assertEqual((repeat["status_before"], repeat["status_after"]), ("running", "running"))
+            store.add_decision("ws_001", action="complete", rationale="done")
+
+            with self.assertRaisesRegex(RegistryError, "invalid status transition: completed -> running"):
+                store.add_decision("ws_001", action="continue", rationale="oops")
+
+            self.assertEqual(store.get_workstream("ws_001")["status"], "completed")
+            self.assertEqual(len(store.list_decisions("ws_001")), 3)
+
+    def test_set_status_enforces_transitions_unless_forced(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = RegistryStore.at(Path(tmp))
+            store.create_workstream(title="Lifecycle", program="pilot")
+
+            with self.assertRaisesRegex(RegistryError, "planned -> completed"):
+                store.set_status("ws_001", "completed")
+            store.set_status("ws_001", "running")
+            store.set_status("ws_001", "completed")
+            with self.assertRaisesRegex(RegistryError, "completed is terminal"):
+                store.set_status("ws_001", "running")
+
+            forced = store.set_status("ws_001", "running", force=True)
+
+            self.assertEqual(forced["status"], "running")
+
+    def test_attach_contract_leaves_contract_untouched_when_workstream_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = RegistryStore.at(Path(tmp))
+            store.init()
+            path = store.contract_version_path("contract_001", 1)
+            path.parent.mkdir(parents=True)
+            path.write_text("# Contract\n", encoding="utf-8")
+            path.chmod(0o644)
+
+            with self.assertRaisesRegex(RegistryError, "not found"):
+                store.attach_contract("ws_404", contract_id="contract_001", version=1)
+
+            self.assertTrue(stat.S_IMODE(path.stat().st_mode) & stat.S_IWUSR)
+
+    def test_ingest_run_bundle_writes_one_packet_carrying_ingest_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RegistryStore.at(root / "store")
+            store.write_contract_version("contract_001", 1, "# Contract\n")
+            store.create_workstream(
+                title="A3 false-positive reduction",
+                program="safety-finetuning",
+                contract_id="contract_001",
+                contract_version=1,
+            )
+            bundle = root / "run-abc123"
+            write_run_bundle(bundle, minimal_manifest())
+
+            packet = store.ingest_run_bundle(bundle)
+
+            self.assertEqual(store.list_packets("ws_001"), [packet])
+            self.assertEqual(
+                packet["ingest"],
+                {
+                    "bundle_path": str(bundle),
+                    "manifest_path": str(bundle / "manifest.json"),
+                    "status": "completed",
+                },
+            )
+
+    def test_ingest_run_bundle_rejects_evidence_symlinked_outside_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RegistryStore.at(root / "store")
+            store.write_contract_version("contract_001", 1, "# Contract\n")
+            store.create_workstream(
+                title="A3 false-positive reduction",
+                program="safety-finetuning",
+                contract_id="contract_001",
+                contract_version=1,
+            )
+            secret = root / "outside" / "secret.json"
+            secret.parent.mkdir()
+            secret.write_text("{}", encoding="utf-8")
+            bundle = root / "run-abc123"
+            write_run_bundle(
+                bundle,
+                minimal_manifest(evidence=[{"summary": "Leaked.", "path": "artifact/leak.json"}]),
+            )
+            symlink_or_skip(self, secret, bundle / "artifact" / "leak.json")
+
+            with self.assertRaisesRegex(RegistryError, "resolves outside the bundle"):
+                store.ingest_run_bundle(bundle)
+
+    def test_ingest_run_bundle_rejects_symlinked_manifest_and_artifact_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RegistryStore.at(root / "store")
+            store.write_contract_version("contract_001", 1, "# Contract\n")
+            store.create_workstream(
+                title="A3 false-positive reduction",
+                program="safety-finetuning",
+                contract_id="contract_001",
+                contract_version=1,
+            )
+            outside = root / "outside"
+            outside.mkdir()
+            (outside / "manifest.json").write_text(json.dumps(minimal_manifest()), encoding="utf-8")
+            (outside / "artifact").mkdir()
+
+            bundle = root / "run-abc123"
+            write_run_bundle(bundle, minimal_manifest())
+            (bundle / "manifest.json").unlink()
+            symlink_or_skip(self, outside / "manifest.json", bundle / "manifest.json")
+            with self.assertRaisesRegex(RegistryError, "manifest.json must be a regular file inside"):
+                store.ingest_run_bundle(bundle)
+
+            (bundle / "manifest.json").unlink()
+            (bundle / "manifest.json").write_text(json.dumps(minimal_manifest()), encoding="utf-8")
+            for child in (bundle / "artifact").rglob("*"):
+                if child.is_file():
+                    child.unlink()
+            for child in sorted((bundle / "artifact").rglob("*"), reverse=True):
+                child.rmdir()
+            (bundle / "artifact").rmdir()
+            symlink_or_skip(self, outside / "artifact", bundle / "artifact")
+            with self.assertRaisesRegex(RegistryError, "artifact directory resolves outside"):
+                store.ingest_run_bundle(bundle)
+
+    def test_reference_resolver_memoizes_source_state_and_resolutions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            alexandria = root / "alexandria"
+            for name in ("a.md", "b.md"):
+                path = alexandria / "papers" / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"# {name}\n", encoding="utf-8")
+            store = RegistryStore.at(root / ".fab")
+            store.add_source("alexandria", alexandria, uri_prefix="alexandria://")
+
+            with mock.patch("fab.refs.git_dirty", return_value=False) as dirty, mock.patch(
+                "fab.refs.sha256_path", return_value="sha256:deadbeef"
+            ) as digest:
+                resolver = store.resolver()
+                first = resolver.resolve("alexandria://papers/a.md")
+                resolver.resolve("alexandria://papers/b.md")
+                again = resolver.resolve("alexandria://papers/a.md")
+
+            self.assertEqual(first, again)
+            self.assertIsNot(first, again)
+            self.assertEqual(first["status"], "resolved")
+            self.assertIs(first["git_dirty"], False)
+            dirty.assert_called_once()
+            self.assertEqual(digest.call_count, 2)
 
 
 if __name__ == "__main__":

@@ -80,6 +80,31 @@ The current `judge` command records append-only human actions with rationale.
 Judgments can target a workstream, artifact, or claim. Lifecycle actions still
 update workstream status only when the judgment target is the workstream.
 
+### Lifecycle transitions
+
+The lifecycle actions map to statuses: `continue` -> `running`, `pause` ->
+`paused`, `stop` -> `stopped`, `complete` -> `completed`, `quarantine` ->
+`quarantined`. Moves are checked against a small transition table:
+
+| From          | Allowed to                                    |
+|---------------|-----------------------------------------------|
+| `planned`     | `running`, `paused`, `stopped`, `quarantined` |
+| `running`     | `paused`, `stopped`, `completed`, `quarantined` |
+| `paused`      | `running`, `stopped`, `completed`, `quarantined` |
+| `quarantined` | `running`, `paused`, `stopped`                |
+| `stopped`     | none (terminal)                               |
+| `completed`   | none (terminal)                               |
+
+Repeating the current status is always allowed, so a second `continue` on a
+running workstream is a no-op for status and still records the judgment. A
+judgment that would make a disallowed move is rejected before anything is
+written. To correct a mistaken terminal status, use the explicit status command
+with `--force`:
+
+```bash
+uv run fab status ws_001 running --force
+```
+
 Judgment target ids:
 
 - workstream: `ws_001`

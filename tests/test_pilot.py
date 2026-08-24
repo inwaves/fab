@@ -45,6 +45,47 @@ class PilotFixtureTest(unittest.TestCase):
             with self.assertRaisesRegex(RegistryError, "empty registry"):
                 seed_pilot_fixture(store)
 
+    def test_seed_pilot_fixture_rejects_stray_store_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = RegistryStore.at(Path(tmp))
+            stray = store.decisions_dir / "ws_001" / "dec_002.json"
+            stray.parent.mkdir(parents=True)
+            stray.write_text("{}", encoding="utf-8")
+
+            with self.assertRaisesRegex(RegistryError, "empty registry"):
+                seed_pilot_fixture(store)
+
+            self.assertEqual(store.existing_workstream_ids(), [])
+
+    def test_pilot_contract_context_is_made_of_resolvable_uris(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = RegistryStore.at(root / ".fab")
+            seed_pilot_fixture(store)
+
+            result = store.check_references(contract_id=PILOT_CONTRACT_ID, version=1)
+            uris = result["comparison"]["explicit_uris"]
+
+            self.assertEqual(len(uris), 3)
+            self.assertTrue(all(uri.startswith("alexandria://papers/") for uri in uris))
+            self.assertEqual(len(result["comparison"]["unresolved_explicit"]), 3)
+
+            alexandria = root / "alexandria"
+            for uri in uris:
+                path = alexandria / uri[len("alexandria://"):]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("# Paper\n", encoding="utf-8")
+            store.add_source("alexandria", alexandria, uri_prefix="alexandria://")
+
+            result = store.check_references(contract_id=PILOT_CONTRACT_ID, version=1)
+
+            self.assertEqual(result["comparison"]["unresolved_explicit"], [])
+            self.assertEqual(
+                {entry["resolution"]["status"] for entry in result["explicit_refs"]},
+                {"resolved"},
+            )
+            self.assertEqual(store.brief(program=PILOT_PROGRAM)["counts"]["explicit_refs"], 3)
+
 
 if __name__ == "__main__":
     unittest.main()
