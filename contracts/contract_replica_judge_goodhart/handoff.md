@@ -30,7 +30,8 @@ itself; it has no Alexandria note yet, so read it from arXiv.
 
 ## Where the result goes
 
-Repository: https://github.com/inwaves/alexandria, branch `main`.
+Repository: https://github.com/inwaves/alexandria. Open a pull request against
+`main`; the ingester reads `main` after the merge.
 
 Directory: `artifacts/replication-oversight/ws_replica_001/<run-id>/`, where
 `<run-id>` is lowercase letters, digits and hyphens, unique under that
