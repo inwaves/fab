@@ -2,7 +2,7 @@
 name = "fab"
 version = "0.1.0"
 description = "Research protocol skeleton for agent-driven alignment work."
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = []
 
 [project.optional-dependencies]
