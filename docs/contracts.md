@@ -35,20 +35,31 @@ The workstream stores only the pointer:
 
 ## Human Workflow
 
-1. Copy `docs/templates/research-contract.md` into the registry path for the new
-   contract version.
+1. Copy `docs/templates/research-contract.md` somewhere under version control.
+   This repository keeps contract sources in `contracts/<contract_id>/vNNN.md`,
+   since the registry store itself (`.fab/`) is not committed.
 2. Fill out the Markdown directly.
-3. Attach the version to a workstream:
+3. Register the version, which copies it into the registry path and locks it
+   read-only:
+
+```bash
+uv run fab contract add contract_001 --version 1 --from contracts/contract_001/v001.md
+```
+
+4. Attach the version to a workstream, or pass `--contract-id` and
+   `--contract-version` to `fab create`:
 
 ```bash
 uv run fab attach-contract ws_001 --contract-id contract_001 --version 1
 ```
 
 Attachment validates that the version file exists and locks it read-only.
+`fab contract show contract_001 --version 1` prints the registered text.
 
-There is intentionally no contract authoring CLI yet. Later, a coordinator agent
-or product UI can help draft these files, but the durable primitive is the
-versioned Markdown file.
+There is intentionally no contract authoring CLI: `contract add` registers a
+file you wrote, it does not draft one. Later, a coordinator agent or product UI
+can help draft these files, but the durable primitive is the versioned Markdown
+file.
 
 ## Contract Philosophy
 

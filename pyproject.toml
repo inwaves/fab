@@ -2,13 +2,13 @@
 name = "fab"
 version = "0.1.0"
 description = "Research protocol skeleton for agent-driven alignment work."
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = []
 
 [project.optional-dependencies]
 # Everything needed to run the test suite and measure coverage. Install with:
 #   uv pip install -e ".[dev]"
-dev = ["pytest>=8", "coverage>=7"]
+dev = ["pytest>=8", "coverage>=7", "jsonschema>=4.18"]
 
 [project.scripts]
 fab = "fab.cli:main"

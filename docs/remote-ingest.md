@@ -148,6 +148,17 @@ That command should:
 - update live state;
 - record ingest status.
 
+The manifest's machine-readable definition is `schemas/run-manifest.schema.json`
+(JSON Schema 2020-12). It accepts exactly what `fab.manifest.normalize_run_manifest`
+accepts, and `tests/test_manifest.py` keeps the two aligned. An agent can check a
+bundle before writing `READY` without a Fab store, using the same code the
+ingester runs:
+
+```bash
+uvx --from git+https://github.com/inwaves/fab fab validate-bundle path/to/run-bundle \
+  --workstream-id ws_001 --contract-id contract_pilot_a3_false_positive --contract-version 1
+```
+
 Fab should keep this boundary small. It is the validation and registration
 primitive, not the long-running process that watches a repository or object
 store.

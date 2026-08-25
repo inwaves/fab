@@ -110,8 +110,7 @@ artifact bundle pointers, claims, evidence, limitations, and used references.
 
 ## Quick Start
 
-This repo requires Python 3.10 or newer (`pyproject.toml`); `.python-version`
-pins 3.14 for local development with `uv`.
+This repo uses Python 3.12 (`.python-version`); `pyproject.toml` requires 3.12 or newer.
 
 ```bash
 uv run fab init
@@ -145,9 +144,11 @@ uv run fab brief
 uv run fab brief --program safety-finetuning-pilot
 uv run fab show ws_001
 uv run fab show ws_001 --brief
+uv run fab contract add contract_001 --version 1 --from contracts/contract_001/v001.md
 uv run fab attach-contract ws_001 --contract-id contract_001 --version 1
 uv run fab packet ws_001 --source agent-a --changed "..." --next "..." --rationale "..."
 uv run fab packet ws_001 --source agent-a --artifact runs/ws_001/baseline-report.md
+uv run fab validate-bundle ../alexandria/artifacts/program/ws_001/run-abc123 --workstream-id ws_001
 uv run fab ingest-run --from ../alexandria/artifacts/program/ws_001/run-abc123
 uv run fab-alexandria-ingester --alexandria ../alexandria --store .fab
 uv run fab sources add alexandria ../alexandria --uri-prefix alexandria://
