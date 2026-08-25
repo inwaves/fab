@@ -463,3 +463,36 @@ def refs_check(data: dict[str, Any]) -> None:
     else:
         print("refs")
     section("References", reference_lines(data))
+
+
+# ---------------------------------------------------------------- contracts
+
+
+def contract_added(result: dict[str, Any]) -> None:
+    contract = result["contract"]
+    print(f"Added contract {contract['id']} v{contract['version']} -> {result['path']}")
+    print(f"title: {dash(result.get('title'))}")
+    print(f"explicit refs: {len(result.get('explicit_refs', []))}")
+
+
+def contract_text(result: dict[str, Any]) -> None:
+    print(result["text"].rstrip())
+
+
+# ---------------------------------------------------------- bundle validation
+
+
+def bundle_valid(result: dict[str, Any]) -> None:
+    run = result["run"]
+    contract = run["contract"]
+    print(row("valid", result["bundle_path"]))
+    print(f"workstream: {run['workstream_id']}")
+    print(f"contract: {contract['id']} v{contract['version']}")
+    print(f"status: {run['status']}")
+    print(
+        "counts\t"
+        + "\t".join(
+            f"{key}={len(run[key])}"
+            for key in ("claims", "evidence", "limitations", "next", "used_refs")
+        )
+    )

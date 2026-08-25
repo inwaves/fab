@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/inwaves/fab/main/schemas/run-manifest.schema.json",
+  "title": "Fab run bundle manifest",
+  "description": "manifest.json at the root of a run bundle. Accepts exactly what fab.manifest.normalize_run_manifest accepts; tests/test_manifest.py keeps the two aligned. Evidence paths must also exist inside the bundle, which a schema cannot check.",
+  "type": "object",
+  "required": [
+    "workstream_id",
+    "contract",
+    "source",
+    "summary",
+    "status",
+    "claims",
+    "evidence",
+    "limitations",
+    "next",
+    "used_refs"
+  ],
+  "additionalProperties": true,
+  "$defs": {
+    "safeId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+      "description": "Letters, digits, underscore and hyphen; used as a path segment."
+    },
+    "nonBlank": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "bundleRelativePath": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*://)(?=.*\\S).+$",
+      "description": "Relative to the bundle root; no leading slash, no '..' segment, no URI scheme."
+    }
+  },
+  "properties": {
+    "workstream_id": { "$ref": "#/$defs/safeId" },
+    "contract": {
+      "type": "object",
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "$ref": "#/$defs/safeId" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "source": { "$ref": "#/$defs/nonBlank" },
+    "summary": { "$ref": "#/$defs/nonBlank" },
+    "status": { "enum": ["completed", "completed_with_limitations", "failed"] },
+    "claims": { "type": "array", "items": { "type": "string" } },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "required": ["summary"],
+            "properties": {
+              "summary": { "$ref": "#/$defs/nonBlank" },
+              "path": { "$ref": "#/$defs/bundleRelativePath" }
+            }
+          }
+        ]
+      }
+    },
+    "limitations": { "type": "array", "items": { "type": "string" } },
+    "next": { "type": "array", "items": { "type": "string" } },
+    "used_refs": { "type": "array", "items": { "type": "string" } }
+  }
+}

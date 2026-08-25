@@ -19,7 +19,9 @@ from typing import Any
 
 from fab import render
 from fab.errors import RegistryError
+from fab.manifest import read_run_bundle
 from fab.pilot import seed_pilot_fixture
+from fab.refs import extract_explicit_uris, markdown_title
 from fab.review import DEFAULT_STALE_DAYS, REVIEW_REASONS
 from fab.status import VALID_DECISION_ACTIONS, VALID_DECISION_TARGET_TYPES, VALID_STATUSES
 from fab.store import RELATIONSHIP_CHOICES, RegistryStore
@@ -85,6 +87,50 @@ def cmd_refs_check(store: RegistryStore, args: argparse.Namespace) -> dict[str, 
         version=args.version,
         workstream_id=args.workstream_id,
     )
+
+
+def cmd_contract_add(store: RegistryStore, args: argparse.Namespace) -> dict[str, Any]:
+    path = Path(args.contract_file)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RegistryError(f"cannot read contract file {path}: {exc.strerror or exc}") from exc
+    stored = store.write_contract_version(args.contract_id, args.version, text)
+    return {
+        "contract": {"id": args.contract_id, "version": args.version},
+        "path": str(stored),
+        "title": markdown_title(text),
+        "explicit_refs": extract_explicit_uris(text),
+    }
+
+
+def cmd_contract_show(store: RegistryStore, args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "contract": {"id": args.contract_id, "version": args.version},
+        "path": str(store.contract_version_path(args.contract_id, args.version)),
+        "text": store.read_contract_version(args.contract_id, args.version),
+    }
+
+
+def cmd_validate_bundle(store: RegistryStore, args: argparse.Namespace) -> dict[str, Any]:
+    """Validate a bundle exactly as ingest would, without reading or writing the store."""
+    if (args.contract_id is None) != (args.contract_version is None):
+        raise RegistryError("--contract-id and --contract-version must be given together")
+    bundle = read_run_bundle(args.bundle_path)
+    run = bundle.run
+    if args.workstream_id and run["workstream_id"] != args.workstream_id:
+        raise RegistryError(
+            f"manifest workstream_id is {run['workstream_id']}, expected {args.workstream_id}"
+        )
+    expected_contract = {"id": args.contract_id, "version": args.contract_version}
+    if args.contract_id and run["contract"] != expected_contract:
+        raise RegistryError(f"manifest contract is {run['contract']}, expected {expected_contract}")
+    return {
+        "bundle_path": str(bundle.path),
+        "manifest_path": str(bundle.manifest_path),
+        "artifact_dir": str(bundle.artifact_dir),
+        "run": run,
+    }
 
 
 def cmd_attention(store: RegistryStore, args: argparse.Namespace) -> list[dict[str, Any]]:
@@ -299,6 +345,33 @@ def build_parser() -> argparse.ArgumentParser:
     refs_target.add_argument("--contract-id")
     refs_check.add_argument("--version", type=int)
 
+    contract = sub.add_parser("contract", help="register and read contract versions")
+    contract_sub = contract.add_subparsers(dest="contract_command", required=True)
+    contract_add = add_command(
+        contract_sub,
+        "add",
+        help="register a contract version from a Markdown file and lock it read-only",
+        run=cmd_contract_add,
+        render=render.contract_added,
+    )
+    contract_add.add_argument("contract_id")
+    contract_add.add_argument("--version", required=True, type=int)
+    contract_add.add_argument(
+        "--from",
+        dest="contract_file",
+        required=True,
+        help="path to the Markdown contract to register",
+    )
+    contract_show = add_command(
+        contract_sub,
+        "show",
+        help="print a registered contract version",
+        run=cmd_contract_show,
+        render=render.contract_text,
+    )
+    contract_show.add_argument("contract_id")
+    contract_show.add_argument("--version", required=True, type=int)
+
     attention = add_command(
         sub,
         "attention",
@@ -403,6 +476,18 @@ def build_parser() -> argparse.ArgumentParser:
         render=render.run_ingested,
     )
     ingest.add_argument("--from", dest="bundle_path", required=True)
+
+    validate = add_command(
+        sub,
+        "validate-bundle",
+        help="validate a run bundle's layout and manifest without touching the store",
+        run=cmd_validate_bundle,
+        render=render.bundle_valid,
+    )
+    validate.add_argument("bundle_path")
+    validate.add_argument("--workstream-id", help="require this workstream id in the manifest")
+    validate.add_argument("--contract-id", help="require this contract id (with --contract-version)")
+    validate.add_argument("--contract-version", type=int)
 
     judge = add_command(
         sub,

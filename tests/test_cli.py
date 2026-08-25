@@ -328,6 +328,64 @@ class CliTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), f"Initialized {self.store}")
 
+    def test_contract_add_show_and_register(self) -> None:
+        contract_file = self.root / "contract.md"
+        contract_file.write_text(
+            "# Contract: Example\n\nSee alexandria://papers/a.md and https://x.test/p.\n",
+            encoding="utf-8",
+        )
+
+        out = self.fab("contract", "add", "contract_001", "--version", "1", "--from", str(contract_file))
+        stored = Path(self.store) / "contracts" / "contract_001" / "v001.md"
+        self.assertEqual(
+            out.splitlines(),
+            [f"Added contract contract_001 v1 -> {stored}", "title: Contract: Example", "explicit refs: 2"],
+        )
+        self.assertEqual(
+            self.fab("contract", "show", "contract_001", "--version", "1").rstrip("\n"),
+            contract_file.read_text(encoding="utf-8").rstrip("\n"),
+        )
+        data = json.loads(self.fab("contract", "add", "contract_001", "--version", "2", "--from", str(contract_file), "--json"))
+        self.assertEqual(data["explicit_refs"], ["alexandria://papers/a.md", "https://x.test/p"])
+
+        err = self.fab("contract", "add", "contract_001", "--version", "1", "--from", str(contract_file), expect=2)
+        self.assertIn("contract version already exists", err)
+        err = self.fab("contract", "add", "contract_002", "--version", "1", "--from", str(self.root / "missing.md"), expect=2)
+        self.assertIn("cannot read contract file", err)
+        err = self.fab("contract", "show", "contract_404", "--version", "1", expect=2)
+        self.assertIn("contract version not found", err)
+
+        out = self.fab("create", "--title", "Scoped", "--program", "p", "--contract-id", "contract_001", "--contract-version", "2")
+        self.assertTrue(out.startswith("ws_001\tplanned\tp\tcontract_001\t"))
+        self.assertIn("explicit=2", self.fab("refs", "check", "--workstream-id", "ws_001"))
+
+    def test_validate_bundle_without_a_store(self) -> None:
+        bundle = self.root / "inbox" / "run-001"
+        write_pilot_bundle(bundle)
+
+        out = self.fab(
+            "validate-bundle", str(bundle),
+            "--workstream-id", "ws_001",
+            "--contract-id", PILOT_CONTRACT_ID, "--contract-version", "1",
+        )
+        self.assertEqual(out.splitlines()[0], f"valid\t{bundle}")
+        self.assertIn(f"workstream: ws_001\ncontract: {PILOT_CONTRACT_ID} v1\nstatus: completed\n", out)
+        self.assertIn("counts\tclaims=1\tevidence=1\tlimitations=0\tnext=0\tused_refs=1", out)
+        data = json.loads(self.fab("validate-bundle", str(bundle), "--json"))
+        self.assertEqual(data["run"]["workstream_id"], "ws_001")
+        self.assertEqual(data["artifact_dir"], str(bundle / "artifact"))
+        self.assertFalse(Path(self.store).exists(), "validation must not create a store")
+
+        err = self.fab("validate-bundle", str(bundle), "--workstream-id", "ws_002", expect=2)
+        self.assertIn("manifest workstream_id is ws_001, expected ws_002", err)
+        err = self.fab("validate-bundle", str(bundle), "--contract-id", PILOT_CONTRACT_ID, "--contract-version", "2", expect=2)
+        self.assertIn("manifest contract is", err)
+        err = self.fab("validate-bundle", str(bundle), "--contract-id", PILOT_CONTRACT_ID, expect=2)
+        self.assertIn("must be given together", err)
+        (bundle / "READY").unlink()
+        err = self.fab("validate-bundle", str(bundle), expect=2)
+        self.assertIn("missing READY", err)
+
 
 if __name__ == "__main__":
     unittest.main()
