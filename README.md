@@ -110,8 +110,7 @@ artifact bundle pointers, claims, evidence, limitations, and used references.
 
 ## Quick Start
 
-This repo requires Python 3.10 or newer (`pyproject.toml`); `.python-version`
-pins 3.14 for local development with `uv`.
+This repo uses Python 3.12 (`.python-version`); `pyproject.toml` requires 3.12 or newer.
 
 ```bash
 uv run fab init
