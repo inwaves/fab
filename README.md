@@ -48,9 +48,10 @@ The implemented pieces are still modest:
   step, and rationale.
 - **Remote ingest boundary**: `ingest-run` accepts completed local bundles from
   execution systems without requiring agents to clone Fab.
-- **Alexandria ingester service**: a thin service under `services/` scans
-  Alexandria for completed bundles, calls Fab's ingest boundary, and records an
-  append-only ingest ledger.
+- **Alexandria ingester service**: `fab.services.alexandria_ingester`
+  (installed as `fab-alexandria-ingester`) scans Alexandria for completed
+  bundles, calls Fab's ingest boundary, and records an append-only ingest
+  ledger.
 - **Artefact packages**: one bundle per run containing the report, code,
   results, logs, claims, evidence, limitations, and suggested follow-up.
 - **Brief**: a compact human-facing view over workstreams, attention reasons,
@@ -109,7 +110,8 @@ artifact bundle pointers, claims, evidence, limitations, and used references.
 
 ## Quick Start
 
-This repo is pinned to Python 3.14 via `.python-version` and `pyproject.toml`.
+This repo requires Python 3.10 or newer (`pyproject.toml`); `.python-version`
+pins 3.14 for local development with `uv`.
 
 ```bash
 uv run fab init
@@ -147,7 +149,7 @@ uv run fab attach-contract ws_001 --contract-id contract_001 --version 1
 uv run fab packet ws_001 --source agent-a --changed "..." --next "..." --rationale "..."
 uv run fab packet ws_001 --source agent-a --artifact runs/ws_001/baseline-report.md
 uv run fab ingest-run --from ../alexandria/artifacts/program/ws_001/run-abc123
-uv run python -m services.alexandria_ingester --alexandria ../alexandria --store .fab
+uv run fab-alexandria-ingester --alexandria ../alexandria --store .fab
 uv run fab sources add alexandria ../alexandria --uri-prefix alexandria://
 uv run fab refs check --contract-id contract_pilot_a3_false_positive --version 1
 uv run fab judge ws_001 --action replicate --rationale "..."
@@ -176,8 +178,8 @@ uv run fab link ws_001 ws_002 --relationship related
 
 ## Test
 
-Install the dev extra (adds pytest) into an editable environment, then run the
-suite with either runner:
+Install the dev extra (adds pytest and coverage) into an editable environment,
+then run the suite with either runner:
 
 ```bash
 uv pip install -e ".[dev]"
@@ -191,9 +193,17 @@ uv run --extra dev pytest
 uv run python -m unittest discover -s tests
 ```
 
-The `[tool.pytest.ini_options]` config and the root `conftest.py` put `src/`
-(the `fab` package) and the repo root (the `services` sidecar) on the path, so
-collection works whether or not the project is installed.
+Measure line and branch coverage (configured in `pyproject.toml`; fully
+covered files are hidden from the report):
+
+```bash
+uv run --extra dev coverage run -m pytest
+uv run --extra dev coverage report
+```
+
+The `[tool.pytest.ini_options]` config puts `src/` (the `fab` package,
+including `fab.services`) on the path, so collection works whether or not the
+project is installed.
 
 If the sibling Alexandria checkout is present, the test suite also ingests the
 durable smoke fixture at

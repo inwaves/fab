@@ -220,7 +220,7 @@ Implemented:
   `artifacts/safety-finetuning-pilot/ws_001/fab-ingest-smoke-001/`;
 - an integration test that seeds a temporary Fab pilot store and ingests that
   fixture through the CLI.
-- `services.alexandria_ingester`, which scans Alexandria, ingests completed
+- `fab.services.alexandria_ingester`, which scans Alexandria, ingests completed
   bundles, records packet ids or errors, and skips already-ingested bundle
   paths through an append-only JSONL ledger.
 

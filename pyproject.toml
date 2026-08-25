@@ -2,16 +2,17 @@
 name = "fab"
 version = "0.1.0"
 description = "Research protocol skeleton for agent-driven alignment work."
-requires-python = ">=3.14"
+requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
-# Everything needed to run the test suite. Install with:
+# Everything needed to run the test suite and measure coverage. Install with:
 #   uv pip install -e ".[dev]"
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "coverage>=7"]
 
 [project.scripts]
 fab = "fab.cli:main"
+fab-alexandria-ingester = "fab.services.alexandria_ingester:main"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -21,8 +22,18 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.pytest.ini_options]
-# `fab` lives under src/ and the `services` sidecar lives at the repo root, so
-# both are put on sys.path for collection. This makes `pytest` work whether or
-# not the project has been installed into the environment.
+# `fab` (including `fab.services`) lives under src/; putting it on sys.path lets
+# `pytest` run whether or not the project has been installed.
 testpaths = ["tests"]
-pythonpath = ["src", "."]
+pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["fab"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# The `if __name__ == "__main__"` guards are exercised by subprocess tests, which
+# coverage cannot observe from the parent process.
+exclude_also = ['if __name__ == "__main__":']

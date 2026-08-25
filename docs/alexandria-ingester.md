@@ -13,7 +13,7 @@ It does four jobs:
 ## Run Once
 
 ```bash
-uv run python -m services.alexandria_ingester \
+uv run python -m fab.services.alexandria_ingester \
   --alexandria ../alexandria \
   --store .fab
 ```
@@ -21,7 +21,7 @@ uv run python -m services.alexandria_ingester \
 With JSON output:
 
 ```bash
-uv run python -m services.alexandria_ingester \
+uv run python -m fab.services.alexandria_ingester \
   --alexandria ../alexandria \
   --store .fab \
   --json
@@ -36,7 +36,7 @@ The default ledger path is:
 ## Polling Mode
 
 ```bash
-uv run python -m services.alexandria_ingester \
+uv run python -m fab.services.alexandria_ingester \
   --alexandria ../alexandria \
   --store .fab \
   --pull \

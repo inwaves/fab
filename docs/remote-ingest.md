@@ -158,7 +158,7 @@ The current implementation is a small service around this boundary, not a Fab
 CLI command:
 
 ```bash
-uv run python -m services.alexandria_ingester \
+uv run python -m fab.services.alexandria_ingester \
   --alexandria ../alexandria \
   --store .fab
 ```
@@ -166,7 +166,7 @@ uv run python -m services.alexandria_ingester \
 It can run once, or poll:
 
 ```bash
-uv run python -m services.alexandria_ingester \
+uv run python -m fab.services.alexandria_ingester \
   --alexandria ../alexandria \
   --store .fab \
   --pull \

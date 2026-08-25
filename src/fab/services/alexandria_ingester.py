@@ -1,24 +1,30 @@
+"""Ingest completed Alexandria run bundles into a Fab store.
+
+Scans ``<alexandria>/artifacts/<program>/<workstream>/<run>/READY`` markers,
+ingests each bundle once, and records every attempt in a JSONL ledger so the
+service can be re-run or polled without double-ingesting. Failed bundles are
+recorded as errors and retried on the next scan.
+
+Run as ``fab-alexandria-ingester`` or ``python -m fab.services.alexandria_ingester``.
+"""
+
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import subprocess
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-try:
-    from fab.registry import RegistryStore, utc_now
-except ModuleNotFoundError:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-    from fab.registry import RegistryStore, utc_now
-
+from fab.provenance import git_commit_for_path, git_dirty, git_head, sha256_file
+from fab.store import RegistryStore
+from fab.util import utc_now
 
 SERVICE_NAME = "alexandria-ingester"
 ARTIFACTS_DIR = "artifacts"
+LEDGER_RELPATH = Path("ingest-ledger") / "alexandria.jsonl"
 
 
 @dataclass(frozen=True)
@@ -33,53 +39,21 @@ class IngesterConfig:
     def ledger_path(self) -> Path:
         if self.ledger is not None:
             return self.ledger
-        return self.store / "ingest-ledger" / "alexandria.jsonl"
+        return self.store / LEDGER_RELPATH
 
-
-def sha256_file(path: Path) -> str | None:
-    if not path.is_file():
-        return None
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def git_output(repo: Path, *args: str) -> str | None:
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(repo), *args],
-            check=True,
-            capture_output=True,
-            text=True,
+    def resolved(self) -> IngesterConfig:
+        """The same configuration with every path made absolute."""
+        return IngesterConfig(
+            alexandria=self.alexandria.resolve(),
+            store=self.store.resolve(),
+            ledger=self.ledger.resolve() if self.ledger is not None else None,
+            pull=self.pull,
+            limit=self.limit,
         )
-    except (OSError, subprocess.CalledProcessError):
-        return None
-    return result.stdout.strip()
 
 
 def git_pull(repo: Path) -> None:
     subprocess.run(["git", "-C", str(repo), "pull", "--ff-only"], check=True)
-
-
-def repo_head(repo: Path) -> str | None:
-    return git_output(repo, "rev-parse", "HEAD")
-
-
-def repo_dirty(repo: Path) -> bool | None:
-    output = git_output(repo, "status", "--short")
-    if output is None:
-        return None
-    return bool(output)
-
-
-def bundle_commit(repo: Path, bundle: Path) -> str | None:
-    try:
-        relpath = bundle.relative_to(repo)
-    except ValueError:
-        return None
-    return git_output(repo, "log", "-n", "1", "--format=%H", "--", str(relpath))
 
 
 def bundle_relpath(repo: Path, bundle: Path) -> str:
@@ -128,18 +102,31 @@ def ingested_bundle_relpaths(entries: list[dict[str, Any]]) -> set[str]:
 
 
 def base_ledger_entry(config: IngesterConfig, bundle: Path) -> dict[str, Any]:
-    relpath = bundle_relpath(config.alexandria, bundle)
+    """The fields that identify a bundle attempt; nothing here touches the bundle contents."""
     return {
         "created_at": utc_now(),
         "service": SERVICE_NAME,
         "alexandria_repo": str(config.alexandria),
-        "alexandria_head_commit": repo_head(config.alexandria),
-        "alexandria_dirty": repo_dirty(config.alexandria),
-        "bundle_relpath": relpath,
+        "bundle_relpath": bundle_relpath(config.alexandria, bundle),
         "bundle_path": str(bundle),
-        "bundle_commit": bundle_commit(config.alexandria, bundle),
-        "manifest_path": str(bundle / "manifest.json"),
-        "manifest_sha256": sha256_file(bundle / "manifest.json"),
+    }
+
+
+def repo_provenance(alexandria: Path) -> dict[str, Any]:
+    """Head commit and dirty state of the Alexandria checkout; never raises."""
+    return {
+        "alexandria_head_commit": git_head(alexandria),
+        "alexandria_dirty": git_dirty(alexandria),
+    }
+
+
+def bundle_provenance(config: IngesterConfig, bundle: Path) -> dict[str, Any]:
+    """Git and manifest provenance for one bundle; may raise on an unreadable bundle."""
+    manifest_path = bundle / "manifest.json"
+    return {
+        "bundle_commit": git_commit_for_path(config.alexandria, bundle),
+        "manifest_path": str(manifest_path),
+        "manifest_sha256": sha256_file(manifest_path),
     }
 
 
@@ -148,11 +135,15 @@ def ingest_bundle(
     bundle: Path,
     *,
     store: RegistryStore,
+    repo: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """Ingest one bundle and ledger the outcome, whether provenance or ingest failed."""
     entry = base_ledger_entry(config, bundle)
+    entry.update(repo if repo is not None else repo_provenance(config.alexandria))
     try:
+        entry.update(bundle_provenance(config, bundle))
         packet = store.ingest_run_bundle(bundle)
-    except Exception as exc:  # noqa: BLE001 - service ledger should capture bundle failures.
+    except Exception as exc:  # noqa: BLE001 - the ledger must record every bundle failure.
         error_entry = {
             **entry,
             "status": "error",
@@ -185,52 +176,45 @@ def ingest_bundle(
 
 
 def run_once(config: IngesterConfig) -> dict[str, Any]:
-    alexandria = config.alexandria.resolve()
-    store_path = config.store.resolve()
-    normalized = IngesterConfig(
-        alexandria=alexandria,
-        store=store_path,
-        ledger=config.ledger.resolve() if config.ledger is not None else None,
-        pull=config.pull,
-        limit=config.limit,
-    )
+    config = config.resolved()
+    if config.pull:
+        git_pull(config.alexandria)
 
-    if normalized.pull:
-        git_pull(normalized.alexandria)
-
-    ledger_entries = read_ledger(normalized.ledger_path)
-    already_ingested = ingested_bundle_relpaths(ledger_entries)
-    bundles = discover_ready_bundles(normalized.alexandria)
-    store = RegistryStore.at(normalized.store)
+    already_ingested = ingested_bundle_relpaths(read_ledger(config.ledger_path))
+    bundles = discover_ready_bundles(config.alexandria)
+    store = RegistryStore.at(config.store)
+    repo = repo_provenance(config.alexandria)
 
     results: list[dict[str, Any]] = []
     processed = 0
     for bundle in bundles:
-        relpath = bundle_relpath(normalized.alexandria, bundle)
+        relpath = bundle_relpath(config.alexandria, bundle)
         if relpath in already_ingested:
             results.append({"bundle_relpath": relpath, "status": "skipped"})
             continue
-        if normalized.limit is not None and processed >= normalized.limit:
+        if config.limit is not None and processed >= config.limit:
             results.append({"bundle_relpath": relpath, "status": "deferred"})
             continue
-        results.append(ingest_bundle(normalized, bundle, store=store))
+        results.append(ingest_bundle(config, bundle, store=store, repo=repo))
         processed += 1
 
     counts = {
-        "discovered": len(bundles),
-        "ingested": sum(1 for item in results if item["status"] == "ingested"),
-        "skipped": sum(1 for item in results if item["status"] == "skipped"),
-        "deferred": sum(1 for item in results if item["status"] == "deferred"),
-        "errors": sum(1 for item in results if item["status"] == "error"),
+        status: sum(1 for item in results if item["status"] == status)
+        for status in ("ingested", "skipped", "deferred", "error")
     }
     return {
         "service": SERVICE_NAME,
-        "alexandria": str(normalized.alexandria),
-        "store": str(normalized.store),
-        "ledger": str(normalized.ledger_path),
-        "alexandria_head_commit": repo_head(normalized.alexandria),
-        "alexandria_dirty": repo_dirty(normalized.alexandria),
-        "counts": counts,
+        "alexandria": str(config.alexandria),
+        "store": str(config.store),
+        "ledger": str(config.ledger_path),
+        **repo,
+        "counts": {
+            "discovered": len(bundles),
+            "ingested": counts["ingested"],
+            "skipped": counts["skipped"],
+            "deferred": counts["deferred"],
+            "errors": counts["error"],
+        },
         "bundles": results,
     }
 
@@ -254,7 +238,7 @@ def print_summary(summary: dict[str, Any], *, as_json: bool) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="alexandria-ingester",
+        prog="fab-alexandria-ingester",
         description="Ingest completed Alexandria run bundles into a Fab store.",
     )
     parser.add_argument("--alexandria", required=True, type=Path)
@@ -284,23 +268,18 @@ def main(argv: list[str] | None = None) -> int:
         limit=args.limit,
     )
 
-    if args.poll_interval is None:
-        summary = run_once(config)
-        print_summary(summary, as_json=args.json)
-        if summary["counts"]["errors"] and not args.allow_errors:
-            return 1
-        return 0
-
     try:
         while True:
             summary = run_once(config)
             print_summary(summary, as_json=args.json)
             if summary["counts"]["errors"] and not args.allow_errors:
                 return 1
+            if args.poll_interval is None:
+                return 0
             time.sleep(args.poll_interval)
     except KeyboardInterrupt:
         return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(main())
